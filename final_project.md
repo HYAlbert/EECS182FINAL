@@ -215,7 +215,13 @@ To select the best device, I overlay **gain circles (18–24 dB)**, the **NF = 1
 
 From the combined plots and the provided 1 GHz parameters:
 
-- **NE7684A (selected)**: offers the best tradeoff because it has the **highest forward gain** (largest $|S_{21}|$) and the **lowest $NF_{min}$**. In the $\Gamma_S$ overlay plot there is a clear overlap between the **NF $\le 1.7$ dB** region and the available-gain circles, and the NF boundary extends into part of the **$\sim$21 dB** gain-circle region.\n+\n+- **NE7684B (rejected)**: is not feasible for the requirements because the **$G_A=18$ dB** gain circle does **not** overlap with the region that satisfies **NF $\le 1.7$ dB**. This means there is no $\Gamma_S$ that meets both the gain and noise requirements at the same time.\n+\n+- **NE7684C (works but worse)**: can work, but has a **smaller overlap** region and a worse tradeoff. For example, the NF boundary only extends to about the **$\sim$20 dB** gain-circle region. NE7684C also has the **lowest $k$** (least stable), so meeting constraints like **VSWR\_IN** during tuning is likely harder.\n+\n+Therefore I proceed with **NE7684A** for the remaining design steps.
+- **NE7684A (selected)**: offers the best tradeoff because it has the **highest forward gain** (largest $|S_{21}|$) and the **lowest $NF_{min}$**. In the $\Gamma_S$ overlay plot there is a clear overlap between the **NF $\le 1.7$ dB** region and the available-gain circles, and the NF boundary extends into part of the **$\sim$21 dB** gain-circle region.
+
+- **NE7684B (rejected)**: is not feasible for the requirements because the **$G_A=18$ dB** gain circle does **not** overlap with the region that satisfies **NF $\le 1.7$ dB**. This means there is no $\Gamma_S$ that meets both the gain and noise requirements at the same time.
+
+- **NE7684C (works but worse)**: can work, but has a **smaller overlap** region and a worse tradeoff. For example, the NF boundary only extends to about the **$\sim$20 dB** gain-circle region. NE7684C also has the **lowest $k$** (least stable), so meeting constraints like **VSWR\_IN** during tuning is likely harder.
+
+Therefore I proceed with **NE7684A** for the remaining design steps.
 
 Step 6: Device Tuning
 
@@ -288,16 +294,19 @@ Here I use $\Gamma_S$ (same as $\Gamma_s$ in the project statement) to denote th
 - **Gain**: $G_A(\Gamma_S) > 18\,\text{dB}$
 - **Noise**: $NF(\Gamma_S)\le 1.7\,\text{dB}$
 - **Input-plane stability margin**: $m_{in}\ge 0.05$ (per the stability-margin construction in Step 2)
-- **Critical input mismatch (VSWR) feasibility**: the terminated device-plane input reflection coefficient must satisfy
-  $$
-  \Gamma_{in}=S_{11}+\frac{S_{12}S_{21}\Gamma_L}{1-S_{22}\Gamma_L}
-  $$
-  and
-  $$
-  \mathrm{VSWR}_{IN,\text{device}}=\frac{1+|\Gamma_{in}|}{1-|\Gamma_{in}|}<3
-  \quad\Longleftrightarrow\quad
-  |\Gamma_{in}|<0.5
-  $$
+- **Critical input mismatch (VSWR) feasibility**: the terminated device-plane input reflection coefficient must satisfy the equations below.
+
+$$
+\Gamma_{in}=S_{11}+\frac{S_{12}S_{21}\Gamma_L}{1-S_{22}\Gamma_L}
+$$
+
+and
+
+$$
+\mathrm{VSWR}_{IN,\text{device}}=\frac{1+|\Gamma_{in}|}{1-|\Gamma_{in}|}<3
+\quad\Longleftrightarrow\quad
+|\Gamma_{in}|<0.5
+$$
 
 Since $\Gamma_{in}$ depends on $\Gamma_L$, this selection is based on the **joint** $\Gamma_S$–$\Gamma_L$ feasible set computed in Step 6. Among feasible points (all hard constraints met), I rank candidates by: (1) higher $G_A$, then (2) lower $NF$, then (3) lower $\mathrm{VSWR}_{IN,\text{device}}$.
 
@@ -399,8 +408,10 @@ In Step 10, I convert the Step 9 electrical lengths to **physical microstrip len
   - $\lambda_{g,50}$ for the 50 $\Omega$ line
   - $\lambda_{g,100}$ for the 100 $\Omega$ stub line
 - **Convert electrical length to physical length**:
-  $$
-  l=\frac{\theta}{2\pi}\,\lambda_g
-  $$
-  using $\lambda_{g,50}$ for the 50 $\Omega$ sections ($\theta_1$, $\theta_2$) and $\lambda_{g,100}$ for each 100 $\Omega$ open stub ($\theta_s$).
+
+$$
+l=\frac{\theta}{2\pi}\,\lambda_g
+$$
+
+Using $\lambda_{g,50}$ for the 50 $\Omega$ sections ($\theta_1$, $\theta_2$) and $\lambda_{g,100}$ for each 100 $\Omega$ open stub ($\theta_s$).
 
