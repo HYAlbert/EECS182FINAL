@@ -276,7 +276,7 @@ All feasible points satisfy the hard constraints ($G_A>18\,\text{dB}$, $NF\le1.7
 
 #### Comparison to NE7684C
 
-I repeated the same coarse joint $\Gamma_S$–$\Gamma_L$ sweep for **NE7684C** under the same hard constraints. On the coarse grid, **NE7684C produced no feasible points**, meaning it could not simultaneously satisfy the gain, noise, VSWR, and stability-margin constraints at 1 GHz.
+I repeated the same coarse joint $\Gamma_S$–$\Gamma_L$ sweep for **NE7684C** under the same hard constraints. On the coarse grid, **NE7684C produced no feasible points**, meaning it could not simultaneously satisfy the gain, noise, VSWR, and stability-margin constraints at 1 GHz. Device C is not an attractive design choice because the overlap between the low-noise region and the required available-gain region is very limited in the ΓS plane, and the corresponding ΓL choices are further constrained by the output stability circle. Therefore, satisfying gain, NF, and both stability-margin requirements simultaneously is difficult, making Device C unsuitable compared with the better alternatives.
 
 This confirms that **NE7684C has worse Step 6 tuning feasibility than NE7684A** under the project specifications.
 
