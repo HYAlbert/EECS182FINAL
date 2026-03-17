@@ -11,8 +11,8 @@ Goal: Select a suitable device among the 3 provided in the data sheet to design 
 - Frequency: $1\,\text{GHz}$
 - $\text{VSWR}_\text{INPUT} < 3:1$ *(Note this spec is critical and must be met)*
 - $\text{VSWR}_\text{OUTPUT} = 1:1$  *(Note this spec is critical and must be met)*
-- (Stability margin)\_INPUT $\geq 0.05$
-- (Stability margin)\_OUTPUT $\geq 0.05$
+- Stability margin at input $\ge 0.05$
+- Stability margin at output $\ge 0.05$
 
 ## Project Instructions
 
@@ -97,7 +97,28 @@ $$C_L = \frac{\bigl(S_{22} - \Delta\, S_{11}^{*}\bigr)^{*}}{\bigl|S_{22}\bigr|^{
 
 $$C_S = \frac{\bigl(S_{11} - \Delta\, S_{22}^{*}\bigr)^{*}}{\bigl|S_{11}\bigr|^{2} - \bigl|\Delta\bigr|^{2}} \qquad r_S = \left|\frac{S_{12}\, S_{21}}{\bigl|S_{11}\bigr|^{2} - \bigl|\Delta\bigr|^{2}}\right|$$
 
-**Determining the stable side:** If $|S_{11}| < 1$ (or $|S_{22}| < 1$), the center of the Smith chart ($\Gamma = 0$) is known to be stable. I test whether the origin lies inside or outside the stability circle. If the origin is outside the circle, the stable region is outside; if inside, the stable region is inside. This determines the sign of the margin adjustment.
+**Load stability circle** (in the $\Gamma_L$ plane):
+
+$$
+C_L = \frac{(S_{22} - \Delta S_{11}^*)^*}{|S_{22}|^2 - |\Delta|^2}
+\qquad
+r_L = \left|\frac{S_{12} S_{21}}{|S_{22}|^2 - |\Delta|^2}\right|
+$$
+
+**Source stability circle** (in the $\Gamma_S$ plane):
+
+$$
+C_S = \frac{(S_{11} - \Delta S_{22}^*)^*}{|S_{11}|^2 - |\Delta|^2}
+\qquad
+r_S = \left|\frac{S_{12} S_{21}}{|S_{11}|^2 - |\Delta|^2}\right|
+$$
+
+**Determining the stable side:**  
+In the $\Gamma_L$ plane, I test the point $\Gamma_L = 0$, which gives $\Gamma_{in} = S_{11}$. So if $|S_{11}| < 1$, the origin is stable in the load plane.  
+
+In the $\Gamma_S$ plane, I test the point $\Gamma_S = 0$, which gives $\Gamma_{out} = S_{22}$. So if $|S_{22}| < 1$, the origin is stable in the source plane.  
+
+I then check whether the origin lies inside or outside the corresponding stability circle. If the origin is outside the circle, the stable region is outside; if the origin is inside, the stable region is inside.
 
 **Stability margin:** I draw a second circle with the same center but radius adjusted by $\pm\,0.05$. If the stable region is **outside** the circle, the margin circle has radius $r + 0.05$ (expanding toward the stable side). If the stable region is **inside** the circle, the margin circle has radius $r - 0.05$ (shrinking toward the stable side). I kept the $\Gamma_S$ and $\Gamma_L$ within the margin circle boundary to satisfy the $\geq 0.05$ stability margin requirement.
 
