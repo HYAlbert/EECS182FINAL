@@ -92,17 +92,21 @@ When $k \leq 1$ the device is only **conditionally stable**, so I draw stability
 **Load stability circle** (in the $\Gamma_{L}$ plane):
 
 $$
-C_{L} = \frac{(S_{22} - \Delta S_{11}^*)^*}{|S_{22}|^2 - |\Delta|^2}
+C_{L}=\frac{\left(S_{22}-\Delta\,S_{11}^{\ast}\right)^{\ast}}
+{\lvert S_{22}\rvert^{2}-\lvert\Delta\rvert^{2}}
 \qquad
-r_{L} = \left|\frac{S_{12} S_{21}}{|S_{22}|^2 - |\Delta|^2}\right|
+r_{L}=\frac{\lvert S_{12}S_{21}\rvert}
+{\left|\lvert S_{22}\rvert^{2}-\lvert\Delta\rvert^{2}\right|}
 $$
 
 **Source stability circle** (in the $\Gamma_{S}$ plane):
 
 $$
-C_{S} = \frac{(S_{11} - \Delta S_{22}^*)^*}{|S_{11}|^2 - |\Delta|^2}
+C_{S}=\frac{\left(S_{11}-\Delta\,S_{22}^{\ast}\right)^{\ast}}
+{\lvert S_{11}\rvert^{2}-\lvert\Delta\rvert^{2}}
 \qquad
-r_{S} = \left|\frac{S_{12} S_{21}}{|S_{11}|^2 - |\Delta|^2}\right|
+r_{S}=\frac{\lvert S_{12}S_{21}\rvert}
+{\left|\lvert S_{11}\rvert^{2}-\lvert\Delta\rvert^{2}\right|}
 $$
 
 **Determining the stable side:**  
