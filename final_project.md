@@ -513,6 +513,7 @@ These 20-ohm / 200-ohm quarter-wave sections are used to feed the gate and drain
 Part 12: Drawing Layout
 
 ![Drawing](documentation/drawing_layout.jpg)
+Note: while the drawing is not 100% to scale, it is pretty close since I did it by hand. Dimensions are provided and labelled for clarity.
 
 Part 13: Final amplifier circuit and performance tradeoff
 

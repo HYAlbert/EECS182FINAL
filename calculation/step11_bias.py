@@ -87,7 +87,7 @@ def microstrip_from_z0(er: float, h_mm: float, f_hz: float, z0_target: float) ->
     )
 
 
-def gate_divider_values(vp: float, vn: float, vg: float, r_total_ohm: float = 100_000.0) -> tuple[float, float, float, float, float]:
+def gate_divider_values(vp: float, vn: float, vg: float, r_total_ohm: float = 10_000.0) -> tuple[float, float, float, float, float]:
     """
     Divider between vp and vn:
       vp -- R1 -- node(vg) -- R2 -- vn
@@ -114,9 +114,9 @@ def main() -> None:
         print(f"  lambda_g = {r.lambda_g_mm:.2f} mm  ->  quarter-wave = {r.quarter_wave_mm:.2f} mm\n")
 
     # Gate bias divider (+5 / -5) for Vg ≈ -0.47 V
-    r1, r2, i, p1, p2 = gate_divider_values(vp=5.0, vn=-5.0, vg=-0.47, r_total_ohm=100_000.0)
+    r1, r2, i, p1, p2 = gate_divider_values(vp=5.0, vn=-5.0, vg=-0.47, r_total_ohm=10_000.0)
     print("Gate divider (+5 V to -5 V):")
-    print("  target Vg ~ -0.47 V -> choose R_total = 100 kOhm")
+    print("  target Vg ~ -0.47 V -> choose R_total = 10 kOhm")
     print(f"  R1 (to +5) = {r1/1e3:.2f} kOhm, R2 (to -5) = {r2/1e3:.2f} kOhm")
     print(f"  I_div = {i*1e3:.3f} mA")
     print(f"  P_R1 = {p1*1e3:.3f} mW, P_R2 = {p2*1e3:.3f} mW\n")

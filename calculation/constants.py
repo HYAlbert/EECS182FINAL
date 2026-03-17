@@ -1,5 +1,5 @@
 """
-S-parameter constants for the three devices.
+Specs for the three devices.
 
 S parameters at VDS = 3 V, ID = 10 mA.
 """
