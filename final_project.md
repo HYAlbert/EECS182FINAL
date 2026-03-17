@@ -24,8 +24,8 @@ Goal: Select a suitable device among the 3 provided in the data sheet to design 
 6. For the selected device tune $\Gamma_s$ to trade off between Gain, noise figure, stability margin and (VSWR)\_INPUT/OUTPUT. Note this last specification **must be met at all costs**.
 7. Select the optimum value for the input $\Gamma_s$ accordingly to the amplifier specifications and stability requirements. Pay particular attention to the VSWR\_IN requirement and make sure you meet this specification.
 8. Select the correspondent value of $\Gamma_L$ and verify the stability requirements for it in the proper plane.
-9. Use two separate Smith's charts to design the input and output matching networks. Use balanced open stubs having characteristic impedance of $100\,\Omega$ in combination with transmission line (as in Fig.1) to design the matching circuit.
-10. Realize your matching circuits in MIC technology using microstrip lines for the matching stub. use open stubs having impedance of $100\,\Omega$. (use the graphs in Fig.3 to design all the microstrip lines). Use Rogers as substrate ($\varepsilon_r = 4$, $h = 0.254\,\text{mm}$) and 201 form factor for the passive components (see Fig. 2) for the bias circuit and the decoupling network.
+9. Use two separate Smith's charts to design the input and output matching networks. Use balanced open stubs having characteristic impedance of $100\,\Omega$ in combination with transmission line to design the matching circuit.
+10. Realize your matching circuits in MIC technology using microstrip lines for the matching stub. use open stubs having impedance of $100\,\Omega$. Use Rogers as substrate ($\varepsilon_r = 4$, $h = 0.254\,\text{mm}$) and 201 form factor for the passive components (see Fig. 2) for the bias circuit and the decoupling network.
 11. Design the bias network for the device including the decupling capacitors as follow:
     - Use High/Low impedance ($200\,\Omega / 20\,\Omega$) quarter wave line/stub configuration to provide the bias to the gate and drain of the device, the source should be connected to ground trough a via hole.
     - Assume differential voltage $V_{CC} = +5\,\text{V} / -5\,\text{V}$ supply is available for the bias of the device.
@@ -37,8 +37,8 @@ Goal: Select a suitable device among the 3 provided in the data sheet to design 
 13. Summarize your final amplifier circuit and performance trade off.
 14. If your design cannot meet all the requirements explain why, discuss what you learn during this project and explain your tradeoffs.
 
-![SMD\_dimensions](SMD_dimensions.jpg)
-![design\_curves](design_curves.jpg)
+![SMD\_dimensions](documentation/SMD_dimensions.jpg)
+![design\_curves](documentation/design_curves.jpg)
 
 Device Specs:
 
@@ -325,3 +325,82 @@ Using the output stability circle and margin circle defined in Step 2, $\Gamma_L
 
 ### Note on the $\mathrm{VSWR}_{OUT}=1{:}1$ requirement
 The project requirement $\mathrm{VSWR}_{OUT}=1{:}1$ is an **external-port** requirement. In Steps 9–10, the output matching network will be synthesized to present the device with $\Gamma_L^\star$ while maintaining a matched $50\,\Omega$ output port.
+
+### Step 9 matching network topology choice (balanced 100 $\Omega$ open stubs on a 50 $\Omega$ line)
+At 1 GHz with $Z_0=50\,\Omega$, the selected reflection coefficients correspond to the following target impedances at the device reference planes:
+$$
+Z_S^\star = Z_0\frac{1+\Gamma_S^\star}{1-\Gamma_S^\star}\approx (20.3 + j25.3)\,\Omega
+$$
+$$
+Z_L^\star = Z_0\frac{1+\Gamma_L^\star}{1-\Gamma_L^\star}\approx (2.50 - j602)\,\Omega
+$$
+
+Per the project constraint, I implement both matching networks using a **50 $\Omega$ through line** and **balanced open stubs** with characteristic impedance **$Z_{0,stub}=100\,\Omega$**. The “balanced” requirement here means using **two identical 100 $\Omega$ open stubs in parallel at the same shunt node**, so the shunt element is symmetric and its susceptance is doubled.
+
+For an open-circuited stub of characteristic impedance $Z_{0,stub}$ and electrical length $\theta=\beta l$, the input admittance is:
+$$
+Y_{stub}=j\frac{1}{Z_{0,stub}}\tan(\theta)
+$$
+Two identical stubs in parallel give:
+$$
+Y_{eq}=2Y_{stub}=j\frac{2}{100}\tan(\theta)=j\frac{1}{50}\tan(\theta)
+$$
+So, **when normalized to 50 $\Omega$**, the balanced stub pair contributes a **pure shunt susceptance**
+$$
+y_{eq}=j\tan(\theta)
+$$
+which is equivalent (in admittance behavior) to a **single 50 $\Omega$ open stub** at the same electrical length.
+
+### Distributed matching network form used in Step 9
+On each Smith chart I use a distributed two-step transformation that is directly realizable with microstrip:
+
+- **Series 50 $\Omega$ line section(s)** (electrical length $\theta$): moves along a constant-$|\Gamma|$ circle (phase rotation).
+- **Shunt balanced open-stub pair** (two identical 100 $\Omega$ stubs of electrical length $\theta_s$ at one node): adds a pure susceptance in the **admittance** plane, $y\rightarrow y + j\tan(\theta_s)$.
+
+This provides the same degrees of freedom as an L-match, but implemented with the required **50 $\Omega$ line + balanced 100 $\Omega$ open stubs**.
+
+#### Verification notes (constraints carried forward)
+- **Device-plane feasibility check (pre-matching)**: after choosing $\Gamma_L^\star$, recompute $\Gamma_{in}(\Gamma_L^\star)$ and verify $|\Gamma_{in}|<0.5$ (equivalently $\mathrm{VSWR}_{IN,\text{device}}<3$). This is a useful feasibility/stability check for the *terminated transistor* at its reference plane, and it is the metric used during the Step 6 tuning sweep.
+- **Output-plane stability margin**: ensure $\Gamma_L^\star$ remains in the stable region of the $\Gamma_L$ plane with margin $\ge 0.05$ (already $m_{out}\approx 1.528$ for the selected point).
+- **Final amplifier-port VSWR check (post-matching)**: once the input/output matching networks are synthesized (Steps 9–10), verify $\mathrm{VSWR}_{IN}$ and $\mathrm{VSWR}_{OUT}$ at the **external $50\,\Omega$ amplifier ports** for the cascaded “matching network + device + matching network” system.
+
+Step 9: Smith-chart design of the input and output matching networks
+
+To synthesize the matching networks, I use **two separate Smith charts** (one in the $\Gamma_S$ plane for the input match and one in the $\Gamma_L$ plane for the output match). Each chart shows the target reflection coefficient at 1 GHz (from Step 7–8) and an example matching trajectory that can be implemented using **microstrip LC equivalents** (series line section for inductive reactance / series capacitor, and open-stub shunt elements for capacitive susceptance) consistent with the required $100\,\Omega$ open-stub + transmission-line structure.
+
+**Input (gate) Smith chart ($\Gamma_S$ plane):** the trajectory uses a **50 $\Omega$ series line** and a **balanced shunt open-stub pair (2× 100 $\Omega$)** to transform from the 50 $\Omega$ port to $\Gamma_S^\star$. (The shunt element is symmetric by construction because the two stubs are identical.) One valid electrical-length solution at 1 GHz is:
+
+- series 50 $\Omega$ line before stubs: $\theta_1 = 0^\circ$
+- each 100 $\Omega$ open stub: $\theta_s \approx 50.75^\circ$  
+- series 50 $\Omega$ line after stubs: $\theta_2 \approx 59.34^\circ$  
+
+With the balanced pair, the normalized shunt susceptance is $y_{eq}=j\tan(\theta_s)\approx j(1.224)$ at the shunt node.
+
+![NE7684A Step 9 Input Smith Chart](documentation/NE7684A_step9_input_smith.jpg)
+
+**Output (drain) Smith chart ($\Gamma_L$ plane):** the trajectory uses the same building blocks (50 $\Omega$ series line + balanced 2×100 $\Omega$ open-stub shunt node) to present $\Gamma_L^\star$ at the device plane while keeping the external output port matched to 50 $\Omega$. One valid electrical-length solution at 1 GHz is:
+
+- series 50 $\Omega$ line before stubs: $\theta_1 = 0^\circ$ *(arbitrary here since the start point is $\Gamma=0$)*  
+- each 100 $\Omega$ open stub: $\theta_s \approx 89.00^\circ$  
+- series 50 $\Omega$ line after stubs: $\theta_2 \approx 95.75^\circ$  
+
+This output match is very reactive/high-Q (the target $\Gamma_L^\star$ is close to the unit circle), so the stub length lands close to $\lambda_g/4$ and the result will be more layout-sensitive and narrowband than the input match.
+
+![NE7684A Step 9 Output Smith Chart](documentation/NE7684A_step9_output_smith.jpg)
+
+Step 10 (handoff): MIC realization of the Step 9 microstrip sections
+
+In Step 10, I convert the Step 9 electrical lengths to **physical microstrip lengths** on Rogers substrate ($\varepsilon_r=4$, $h=0.254\,\text{mm}$) using the provided microstrip design curves:
+
+- **Determine widths** from the design curves:
+  - $W_{50}$ for a 50 $\Omega$ microstrip line (through line sections)
+  - $W_{100}$ for a 100 $\Omega$ microstrip line (each open stub)
+- **Determine guided wavelength** for each impedance class (because $W/h$ differs):
+  - $\lambda_{g,50}$ for the 50 $\Omega$ line
+  - $\lambda_{g,100}$ for the 100 $\Omega$ stub line
+- **Convert electrical length to physical length**:
+  $$
+  l=\frac{\theta}{2\pi}\,\lambda_g
+  $$
+  using $\lambda_{g,50}$ for the 50 $\Omega$ sections ($\theta_1$, $\theta_2$) and $\lambda_{g,100}$ for each 100 $\Omega$ open stub ($\theta_s$).
+
