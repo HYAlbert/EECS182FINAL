@@ -21,8 +21,8 @@ Goal: Select a suitable device among the 3 provided in the data sheet to design 
 3. For each device draw the available gain circles in the proper plane.
 4. For each device draw the noise figure circles in the proper plane.
 5. Select the device that satisfy or exceed the requirements specified above, explain your choice and explain why you select one device vs. the other two.
-6. For the selected device tune $\Gamma_s$ to trade off between gain, noise figure, stability margins, and $\mathrm{VSWR}_{IN}/\mathrm{VSWR}_{OUT}$. Note this last specification **must be met at all costs**.
-7. Select the optimum value for the input $\Gamma_s$ accordingly to the amplifier specifications and stability requirements. Pay particular attention to the $\mathrm{VSWR}_{IN}$ requirement and make sure you meet this specification.
+6. For the selected device tune $\Gamma_s$ to trade off between gain, noise figure, stability margins, and `VSWR_IN` / `VSWR_OUT`. Note this last specification **must be met at all costs**.
+7. Select the optimum value for the input $\Gamma_s$ accordingly to the amplifier specifications and stability requirements. Pay particular attention to the `VSWR_IN` requirement and make sure you meet this specification.
 8. Select the correspondent value of $\Gamma_L$ and verify the stability requirements for it in the proper plane.
 9. Use two separate Smith's charts to design the input and output matching networks. Use balanced open stubs having characteristic impedance of $100\,\Omega$ in combination with transmission line to design the matching circuit.
 10. Realize your matching circuits in MIC technology using microstrip lines for the matching stub. use open stubs having impedance of $100\,\Omega$. Use Rogers as substrate ($\varepsilon_r = 4$, $h = 0.254\,\text{mm}$) and 201 form factor for the passive components (see Fig. 2) for the bias circuit and the decoupling network.
@@ -81,7 +81,7 @@ At 1 GHz, I evaluate all three devices by:
 - Checking stability and plotting input/output stability circles (with required stability margins).
 - Plotting available-gain circles and NF circles in the $\Gamma_S$ plane to see whether the gain/noise/stability constraints can overlap.
 - Selecting the most feasible device, then performing a joint $\Gamma_S$–$\Gamma_L$ termination sweep to satisfy the **hard** specs (gain, NF, stability margins, and the critical input VSWR constraint).
-- Synthesizing microstrip matching networks to present the selected $\Gamma_S^\star$ and $\Gamma_L^\star$ while meeting the **external-port** VSWR requirements.
+- Synthesizing microstrip matching networks to present the selected `Gamma_S*` and `Gamma_L*` while meeting the **external-port** VSWR requirements.
 
 Step 2: Stability Analysis
 
@@ -243,33 +243,35 @@ Step 6: Device Tuning
 
 ### Device Tuning Sweep
 
-For the selected device (**NE7684A**) at $1\,\text{GHz}$, I perform a **joint device-plane sweep** over both $\Gamma_S$ and $\Gamma_L$ to find a termination pair that satisfies the hard requirements on gain, noise, stability margin, and input VSWR.
+For the selected device (**NE7684A**) at 1 GHz, I perform a **joint device-plane sweep** over both `Gamma_S` and `Gamma_L` to find a termination pair that satisfies the hard requirements on gain, noise, stability margin, and input VSWR.
 
 #### Why the sweep must be joint
-If I force $\Gamma_L=\Gamma_{out}^\*$ (the available-gain assumption used for Step 3 circles), I may get high gain but not the best input match. Because the **external input VSWR spec is critical** ($\mathrm{VSWR}_{IN}<3{:}1$), I tune $\Gamma_S$ and $\Gamma_L$ jointly so the terminated device can simultaneously meet gain/noise while keeping $|\Gamma_{in}|$ small enough.
+If I force `Gamma_L = Gamma_out*` (the available-gain assumption used for Step 3 circles), I may get high gain but not the best input match. Because the **external input VSWR spec is critical** (`VSWR_IN < 3:1`), I tune `Gamma_S` and `Gamma_L` jointly so the terminated device can simultaneously meet gain/noise while keeping `|Gamma_in|` small enough.
 
 #### Device-plane input VSWR check
-For each candidate $\Gamma_L$, I compute the terminated two-port input reflection coefficient
+For each candidate `Gamma_L`, I compute the terminated two-port input reflection coefficient:
 
 $$
 \Gamma_{in}=S_{11}+\frac{S_{12}S_{21}\Gamma_L}{1-S_{22}\Gamma_L}
 $$
-and compute the corresponding device-plane input VSWR:
+
+Then I compute the corresponding device-plane input VSWR:
 
 $$
-\mathrm{VSWR}_{IN,\text{device}}=\frac{1+|\Gamma_{in}|}{1-|\Gamma_{in}|}
+VSWR_{IN,device}=\frac{1+|\Gamma_{in}|}{1-|\Gamma_{in}|}
 $$
-During Step 6 I require $\mathrm{VSWR}_{IN,\text{device}}<3$ as a feasibility check. The final **external-port** VSWR requirements are still verified after synthesizing the matching networks in later steps.
+
+During Step 6 I require `VSWR_IN_device < 3` as a feasibility check. The final **external-port** VSWR requirements are still verified after synthesizing the matching networks in later steps.
 
 #### Gain and noise metrics
-- **Gain constraint:** because Step 6 varies *both* terminations, I enforce the gain requirement using the **transducer gain** $G_T(\Gamma_S,\Gamma_L)$ of the terminated two-port (this is the gain that actually depends on both $\Gamma_S$ and $\Gamma_L$).
-- **Noise constraint:** I enforce $NF(\Gamma_S)\le1.7\,\text{dB}$ using the device noise parameters.
-- **Link to Step 3 plots:** I still use the **available gain** circles (Step 3) as a visualization aid in the $\Gamma_S$ plane, but the joint sweep feasibility is evaluated with $G_T$.
+- **Gain constraint:** because Step 6 varies *both* terminations, I enforce the gain requirement using the transducer gain `GT(Gamma_S, Gamma_L)` of the terminated two-port.
+- **Noise constraint:** I enforce `NF(Gamma_S) <= 1.7 dB` using the device noise parameters.
+- **Link to Step 3 plots:** I still use the available-gain circles (Step 3) as a visualization aid in the `Gamma_S` plane, but the joint sweep feasibility is evaluated with `GT`.
 
 #### Stability margins
 I enforce the stability margin constraints using signed distance to the stability-circle boundaries in both planes:
-- source plane uses $\Gamma=\Gamma_S$
-- load plane uses $\Gamma=\Gamma_L$
+- source plane uses Gamma = Gamma_S
+- load plane uses Gamma = Gamma_L
 with the requirement that both margins are $\ge 0.05$.
 
 #### Sweep and refinement outputs
@@ -280,23 +282,23 @@ Outputs are saved as:
 - `documentation/NE7684A_step6_joint_refined.csv`
 - `documentation/NE7684C_step6_joint_sweep.csv`
 
-All feasible points satisfy the hard constraints (gain $>18\,\text{dB}$, $NF\le1.7\,\text{dB}$, $\mathrm{VSWR}_{IN,\text{device}}<3$, and stability margins $\ge 0.05$). Since stability is enforced as a hard constraint, I rank feasible points primarily by **gain**, then **noise figure**, then **VSWR**:
+All feasible points satisfy the hard constraints (gain > 18 dB, NF <= 1.7 dB, `VSWR_IN_device < 3`, and stability margins >= 0.05). Since stability is enforced as a hard constraint, I rank feasible points primarily by **gain**, then **noise figure**, then **VSWR**:
 
 1. higher gain
-2. lower $NF$
-3. lower $\mathrm{VSWR}_{IN,\text{device}}$
+2. lower NF
+3. lower `VSWR_IN_device`
 
 **NE7684A best coarse feasible point (ranked):**
-- $\Gamma_S \approx -0.2500 + j0.4330$
-- $\Gamma_L \approx 0.9356 - j0.1650$
-- gain $\approx 21.16\,\text{dB}$, $NF \approx 1.63\,\text{dB}$, $\mathrm{VSWR}_{IN,\text{device}} \approx 2.40$
-- stability margins: $m_{in}\approx 0.319$, $m_{out}\approx 1.488$
+- `Gamma_S` ≈ -0.2500 + j0.4330
+- `Gamma_L` ≈ 0.9356 - j0.1650
+- gain ≈ 21.16 dB, NF ≈ 1.63 dB, `VSWR_IN_device` ≈ 2.40
+- stability margins: `m_in` ≈ 0.319, `m_out` ≈ 1.488
 
 **NE7684A best refined feasible point (ranked):**
-- $\Gamma_S \approx -0.2600 + j0.4530$
-- $\Gamma_L \approx 0.9856 - j0.1650$
-- gain $\approx 21.32\,\text{dB}$, $NF \approx 1.70\,\text{dB}$, $\mathrm{VSWR}_{IN,\text{device}} \approx 2.35$
-- stability margins: $m_{in}\approx 0.301$, $m_{out}\approx 1.528$
+- `Gamma_S` ≈ -0.2600 + j0.4530
+- `Gamma_L` ≈ 0.9856 - j0.1650
+- gain ≈ 21.32 dB, NF ≈ 1.70 dB, `VSWR_IN_device` ≈ 2.35
+- stability margins: `m_in` ≈ 0.301, `m_out` ≈ 1.528
 
 #### Comparison to NE7684C
 
@@ -304,42 +306,42 @@ I repeated the same coarse joint $\Gamma_S$–$\Gamma_L$ sweep for **NE7684C** u
 
 This confirms that **NE7684C has worse Step 6 tuning feasibility than NE7684A** under the project specifications.
 
-Step 7: Select the optimum input $\Gamma_S$
+Step 7: Select the optimum input Gamma_S
 
 ### Definition of “optimum” and hard constraints
-Here I use $\Gamma_S$ (same as $\Gamma_s$ in the project statement) to denote the source/input reflection coefficient. The optimum $\Gamma_S$ is selected from the feasible region in the $\Gamma_S$ plane that simultaneously satisfies:
+Here I use `Gamma_S` (same as `Gamma_s` in the project statement) to denote the source/input reflection coefficient. The optimum `Gamma_S` is selected from the feasible region in the `Gamma_S` plane that simultaneously satisfies:
 
-- **Gain**: $G_T(\Gamma_S,\Gamma_L) > 18\,\text{dB}$
-- **Noise**: $NF(\Gamma_S)\le 1.7\,\text{dB}$
-- **Input-plane stability margin**: $m_{in}\ge 0.05$ (per the stability-margin construction in Step 2)
-- **Critical input mismatch feasibility (device plane):** the Step 6 device-plane check $\mathrm{VSWR}_{IN,\text{device}}<3$ (equivalently $|\Gamma_{in}|<0.5$).
+- **Gain**: `GT(Gamma_S, Gamma_L) > 18 dB`
+- **Noise**: `NF(Gamma_S) <= 1.7 dB`
+- **Input-plane stability margin**: `m_in >= 0.05` (per the stability-margin construction in Step 2)
+- **Critical input mismatch feasibility (device plane):** `VSWR_IN_device < 3` (equivalently `|Gamma_in| < 0.5`)
 
-Since $\Gamma_{in}$ depends on $\Gamma_L$, this selection is based on the **joint** $\Gamma_S$–$\Gamma_L$ feasible set computed in Step 6. Among feasible points (all hard constraints met), I rank candidates by: (1) higher gain, then (2) lower $NF$, then (3) lower $\mathrm{VSWR}_{IN,\text{device}}$.
+Since `Gamma_in` depends on `Gamma_L`, this selection is based on the **joint** `Gamma_S`–`Gamma_L` feasible set computed in Step 6. Among feasible points (all hard constraints met), I rank candidates by: (1) higher gain, then (2) lower NF, then (3) lower `VSWR_IN_device`.
 
-### Selected optimum $\Gamma_S$
+### Selected optimum Gamma_S
 From the refined joint sweep for **NE7684A**, the optimum input termination is:
 
-- $\Gamma_S^\star \approx -0.2600 + j0.4530$
+- `Gamma_S*` ≈ -0.2600 + j0.4530
 
 At this point the design meets all hard constraints:
-- gain $\approx 21.32\,\text{dB}$
-- $NF \approx 1.70\,\text{dB}$
-- $\mathrm{VSWR}_{IN,\text{device}} \approx 2.35$ (i.e., $|\Gamma_{in}|<0.5$)
-- input stability margin: $m_{in}\approx 0.301\ge 0.05$
+- gain ≈ 21.32 dB
+- NF ≈ 1.70 dB
+- `VSWR_IN_device` ≈ 2.35 (i.e., `|Gamma_in| < 0.5`)
+- input stability margin: `m_in` ≈ 0.301 >= 0.05
 
-Step 8: Select the corresponding $\Gamma_L$ and verify stability requirements
+Step 8: Select the corresponding Gamma_L and verify stability requirements
 
-The corresponding output termination for the selected $\Gamma_S^\star$ (from the same refined feasible optimum) is:
+The corresponding output termination for the selected `Gamma_S*` (from the same refined feasible optimum) is:
 
-- $\Gamma_L^\star \approx 0.9856 - j0.1650$
+- `Gamma_L*` ≈ 0.9856 - j0.1650
 
 ### Output-plane stability margin verification
-Using the output stability circle and margin circle defined in Step 2, $\Gamma_L^\star$ must lie in the **stable region** and satisfy the required stability margin:
+Using the output stability circle and margin circle defined in Step 2, `Gamma_L*` must lie in the **stable region** and satisfy the required stability margin:
 
 - output stability margin: $m_{out}\approx 1.528\ge 0.05$
 
-### Note on the $\mathrm{VSWR}_{OUT}=1{:}1$ requirement
-The project requirement $\mathrm{VSWR}_{OUT}=1{:}1$ is an **external-port** requirement. In Steps 9–10, the output matching network will be synthesized to present the device with $\Gamma_L^\star$ while maintaining a matched $50\,\Omega$ output port.
+### Note on the VSWR_OUT = 1:1 requirement
+The project requirement `VSWR_OUT = 1:1` is an **external-port** requirement. In Steps 9–10, the output matching network will be synthesized to present the device with `Gamma_L*` while maintaining a matched 50-ohm output port.
 
 ### Step 9 matching network topology choice (balanced 100 $\Omega$ open stubs on a 50 $\Omega$ line)
 At 1 GHz with $Z_0=50\,\Omega$, the selected reflection coefficients correspond to the following target impedances at the device reference planes:
@@ -382,31 +384,41 @@ On each Smith chart I use a distributed two-element form that is directly realiz
 This provides the same degrees of freedom as an L-match, but implemented with the required **50 $\Omega$ line + balanced 100 $\Omega$ open stubs**.
 
 #### Verification notes (constraints carried forward)
-- **Device-plane feasibility (chosen terminations):** verify $|\Gamma_{in}(\Gamma_L^\star)|<0.5$ (equivalently $\mathrm{VSWR}_{IN,\text{device}}<3$).
-- **Output-plane stability margin:** verify $\Gamma_L^\star$ satisfies the Step 2 margin requirement in the $\Gamma_L$ plane (already $m_{out}\approx 1.528$ for the selected point).
-- **External-port match (after synthesis):** verify $\mathrm{VSWR}_{IN}<3{:}1$ and $\mathrm{VSWR}_{OUT}=1{:}1$ at the external $50\,\Omega$ ports for the full network.
+- **Device-plane feasibility (chosen terminations):** verify `|Gamma_in(Gamma_L*)| < 0.5` (equivalently `VSWR_IN_device < 3`).
+- **Output-plane stability margin:** verify `Gamma_L*` satisfies the Step 2 margin requirement in the `Gamma_L` plane (already `m_out` ≈ 1.528 for the selected point).
+- **External-port match (after synthesis):** verify `VSWR_IN < 3:1` and `VSWR_OUT = 1:1` at the external 50-ohm ports for the full network.
 
 Step 9: Smith-chart design of the input and output matching networks
 
-To synthesize the matching networks, I use **two separate Smith charts** (one in the $\Gamma_S$ plane for the input match and one in the $\Gamma_L$ plane for the output match). Each chart shows the target reflection coefficient at 1 GHz (from Step 7–8) and one matching trajectory realizable with the required **series 50 $\Omega$ line section(s)** and **shunt balanced 2×100 $\Omega$ open stubs**.
+To synthesize the matching networks, I use **two separate Smith charts** (one in the Gamma_S plane for the input match and one in the Gamma_L plane for the output match). Each chart shows the target reflection coefficient at 1 GHz (from Step 7–8) and one matching trajectory realizable with the required **series 50-ohm line section(s)** and **shunt balanced 2×100-ohm open stubs**.
 
-**Input (gate) Smith chart ($\Gamma_S$ plane):** the trajectory uses a **50 $\Omega$ series line** and a **balanced shunt open-stub pair (2× 100 $\Omega$)** to transform from the 50 $\Omega$ port to $\Gamma_S^\star$. (The shunt element is symmetric by construction because the two stubs are identical.) One valid electrical-length solution at 1 GHz is:
+**Input (gate) Smith chart (Gamma_S plane):** the trajectory uses a **50-ohm series line** and a **balanced shunt open-stub pair (2× 100-ohm)** to transform from the 50-ohm port to `Gamma_S*`. (The shunt element is symmetric by construction because the two stubs are identical.) One valid electrical-length solution at 1 GHz is:
 
-- series 50 $\Omega$ line before stubs: $\theta_1 = 0^\circ$
-- each 100 $\Omega$ open stub: $\theta_s \approx 50.75^\circ$  
-- series 50 $\Omega$ line after stubs: $\theta_2 \approx 59.34^\circ$  
+- series 50-ohm line before stubs: theta_1 = 0 degrees
+- each 100-ohm open stub: theta_s ≈ 50.75 degrees  
+- series 50-ohm line after stubs: theta_2 ≈ 59.34 degrees  
 
-With the balanced pair, the normalized shunt susceptance is $y_{eq}=j\tan(\theta_s)\approx j(1.224)$ at the shunt node.
+With the balanced pair, the normalized shunt susceptance at the shunt node is approximately j(1.224).
+
+Equivalent shunt capacitance at 1 GHz (balanced pair):
+- tan(theta_s) ≈ 1.224
+- B ≈ 1.224 · (1/50) S ≈ 0.0245 S
+- C_eq ≈ 3.9 pF total (about 1.95 pF per 100-ohm stub)
 
 ![NE7684A Step 9 Input Smith Chart](documentation/NE7684A_step9_input_smith.jpg)
 
-**Output (drain) Smith chart ($\Gamma_L$ plane):** the trajectory uses the same building blocks (50 $\Omega$ series line + balanced 2×100 $\Omega$ open-stub shunt node) to present $\Gamma_L^\star$ at the device plane while keeping the external output port matched to 50 $\Omega$. One valid electrical-length solution at 1 GHz is:
+**Output (drain) Smith chart (Gamma_L plane):** the trajectory uses the same building blocks (50-ohm series line + balanced 2×100-ohm open-stub shunt node) to present `Gamma_L*` at the device plane while keeping the external output port matched to 50 ohm. One valid electrical-length solution at 1 GHz is:
 
-- series 50 $\Omega$ line before stubs: $\theta_1 = 0^\circ$ *(arbitrary here since the start point is $\Gamma=0$)*  
-- each 100 $\Omega$ open stub: $\theta_s \approx 89.00^\circ$  
-- series 50 $\Omega$ line after stubs: $\theta_2 \approx 95.75^\circ$  
+- series 50-ohm line before stubs: theta_1 = 0 degrees (arbitrary here since the start point is Gamma = 0)  
+- each 100-ohm open stub: theta_s ≈ 89.00 degrees  
+- series 50-ohm line after stubs: theta_2 ≈ 95.75 degrees  
 
-This output match is very reactive/high-Q (the target $\Gamma_L^\star$ is close to the unit circle), so the stub length lands close to $\lambda_g/4$ and the result will be more layout-sensitive and narrowband than the input match.
+This output match is very reactive/high-Q (the target `Gamma_L*` is close to the unit circle), so the stub length lands close to a quarter wavelength and the result will be more layout-sensitive and narrowband than the input match.
+
+Equivalent shunt capacitance at 1 GHz (balanced pair):
+- tan(theta_s) ≈ tan(89.00 degrees) ≈ 57.3
+- B ≈ 57.3 · (1/50) S ≈ 1.146 S
+- C_eq ≈ 182 pF total (about 91 pF per 100-ohm stub)
 
 ![NE7684A Step 9 Output Smith Chart](documentation/NE7684A_step9_output_smith.jpg)
 
