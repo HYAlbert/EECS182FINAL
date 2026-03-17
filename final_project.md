@@ -97,20 +97,20 @@ $$C_L = \frac{\bigl(S_{22} - \Delta\, S_{11}^{*}\bigr)^{*}}{\bigl|S_{22}\bigr|^{
 
 $$C_S = \frac{\bigl(S_{11} - \Delta\, S_{22}^{*}\bigr)^{*}}{\bigl|S_{11}\bigr|^{2} - \bigl|\Delta\bigr|^{2}} \qquad r_S = \left|\frac{S_{12}\, S_{21}}{\bigl|S_{11}\bigr|^{2} - \bigl|\Delta\bigr|^{2}}\right|$$
 
-**Load stability circle** (in the $\Gamma_L$ plane):
+**Load stability circle** (in the $\Gamma_{L}$ plane):
 
 $$
-C_L = \frac{(S_{22} - \Delta S_{11}^*)^*}{|S_{22}|^2 - |\Delta|^2}
+C_{L} = \frac{(S_{22} - \Delta S_{11}^*)^*}{|S_{22}|^2 - |\Delta|^2}
 \qquad
-r_L = \left|\frac{S_{12} S_{21}}{|S_{22}|^2 - |\Delta|^2}\right|
+r_{L} = \left|\frac{S_{12} S_{21}}{|S_{22}|^2 - |\Delta|^2}\right|
 $$
 
-**Source stability circle** (in the $\Gamma_S$ plane):
+**Source stability circle** (in the $\Gamma_{S}$ plane):
 
 $$
-C_S = \frac{(S_{11} - \Delta S_{22}^*)^*}{|S_{11}|^2 - |\Delta|^2}
+C_{S} = \frac{(S_{11} - \Delta S_{22}^*)^*}{|S_{11}|^2 - |\Delta|^2}
 \qquad
-r_S = \left|\frac{S_{12} S_{21}}{|S_{11}|^2 - |\Delta|^2}\right|
+r_{S} = \left|\frac{S_{12} S_{21}}{|S_{11}|^2 - |\Delta|^2}\right|
 $$
 
 **Determining the stable side:**  
