@@ -1,8 +1,10 @@
 """
-Stability-circle calculations for EECS 182 Final Project.
+Stability-circle and available-gain-circle calculations for EECS 182 Final Project.
 
 Computes input and output stability circles (center, radius) for each device,
 determines the stable side, and provides a margin-adjusted radius (±0.05).
+Also computes constant available gain (G_A) circles in the Γ_S plane using
+g_A = G_A/|S21|^2.
 """
 
 import cmath
@@ -10,6 +12,7 @@ import math
 from constants import ALL_DEVICE_S_PARAMS
 
 STABILITY_MARGIN = 0.05
+GAIN_LEVELS_DB = [18, 19, 20, 21, 22, 23, 24]
 
 
 def polar_to_complex(mag: float, phase_deg: float) -> complex:
@@ -91,6 +94,112 @@ def compute_margin_radius(radius: float, stable_inside: bool) -> float:
     return radius + STABILITY_MARGIN
 
 
+def db_to_linear(db: float) -> float:
+    """Convert power gain from dB to linear."""
+    return 10 ** (db / 10.0)
+
+
+def compute_available_gain_linear(S: dict, gamma_s: complex) -> float:
+    """
+    Compute available gain G_A (linear) at a given Γ_S.
+    G_A = |S21|^2 * (1 - |ΓS|^2) / (|1 - S11 ΓS|^2 * (1 - |Γout|^2))
+    where Γout = S22 + (S12 S21 ΓS) / (1 - S11 ΓS)
+    """
+    gamma_out = S["S22"] + (S["S12"] * S["S21"] * gamma_s) / (1 - S["S11"] * gamma_s)
+    denom1 = 1 - S["S11"] * gamma_s
+    denom2 = 1 - abs(gamma_out) ** 2
+    if abs(denom1) < 1e-12 or denom2 <= 0:
+        return float("inf")  # Singular or unstable
+    ga = (abs(S["S21"]) ** 2) * (1 - abs(gamma_s) ** 2) / (abs(denom1) ** 2 * denom2)
+    return ga
+
+
+def compute_available_gain_circle(S: dict, ga_dB: float) -> tuple | None:
+    """
+    Compute center and radius of constant available gain circle in the Γ_S plane.
+
+    Uses g_A = G_A/|S21|^2 with G_A in linear form. Formulas:
+        C_1 = S11 - Δ S22*
+        D_A = 1 + g_A(|S11|^2 - |Δ|^2)
+        c_A = g_A C_1* / D_A
+        r_A = sqrt(1 - 2k|S12 S21|g_A + (|S12 S21|g_A)^2) / |D_A|
+
+    Returns (center, radius) or None if the radicand is negative (circle not realizable).
+    """
+    delta = compute_delta(S)
+    k = compute_rollet_k(S)
+    s12s21 = S["S12"] * S["S21"]
+    s12s21_mag = abs(s12s21)
+
+    ga_linear = db_to_linear(ga_dB)
+    ga = ga_linear / (abs(S["S21"]) ** 2)
+
+    c1 = S["S11"] - delta * S["S22"].conjugate()
+    da = 1 + ga * (abs(S["S11"]) ** 2 - abs(delta) ** 2)
+
+    radicand = 1 - 2 * k * s12s21_mag * ga + (s12s21_mag * ga) ** 2
+    if radicand < 0:
+        return None
+
+    center = (ga * c1.conjugate()) / da
+    radius = math.sqrt(radicand) / abs(da)
+    return center, radius
+
+
+def compute_all_gain_circles() -> dict:
+    """
+    Compute available gain circles for every device at GAIN_LEVELS_DB.
+
+    Returns a nested dict keyed by device name, each containing:
+        - gain_circles: list of {ga_dB, center, radius, valid}
+        - input: stability circle data (for overlay)
+    """
+    stability = compute_all_stability_circles()
+    results = {}
+    for name, raw in ALL_DEVICE_S_PARAMS.items():
+        S = get_complex_s_params(raw)
+        circles = []
+        for ga_dB in GAIN_LEVELS_DB:
+            result = compute_available_gain_circle(S, ga_dB)
+            if result is not None:
+                center, radius = result
+                circles.append({"ga_dB": ga_dB, "center": center, "radius": radius, "valid": True})
+            else:
+                circles.append({"ga_dB": ga_dB, "center": None, "radius": None, "valid": False})
+        results[name] = {
+            "gain_circles": circles,
+            "input": stability[name]["input"],
+        }
+    return results
+
+
+def verify_gain_circle(
+    S: dict,
+    ga_dB: float,
+    center: complex,
+    radius: float,
+    n_points: int = 36,
+) -> float:
+    """
+    Sample points on the gain circle and compute G_A at each. Return max |error| in dB.
+    Confirms the plotted circle matches the constant-G_A contour.
+    """
+    target_linear = db_to_linear(ga_dB)
+    max_err_db = 0.0
+    for i in range(n_points):
+        theta = 2 * math.pi * i / n_points
+        gamma_s = center + radius * cmath.rect(1, theta)
+        if abs(gamma_s) >= 1.0:
+            continue  # Outside unit circle, skip
+        ga_linear = compute_available_gain_linear(S, gamma_s)
+        if ga_linear <= 0 or not math.isfinite(ga_linear):
+            continue
+        ga_db = 10 * math.log10(ga_linear)
+        err_db = abs(ga_db - ga_dB)
+        max_err_db = max(max_err_db, err_db)
+    return max_err_db
+
+
 def compute_all_stability_circles() -> dict:
     """
     Compute stability circles for every device.
@@ -145,3 +254,14 @@ if __name__ == "__main__":
                 f"radius = {d['radius']:.4f}, margin_radius = {d['margin_radius']:.4f}, "
                 f"stable_inside = {d['stable_inside']}"
             )
+
+    # Verify gain circles: sample points on each circle and check G_A matches
+    gain_results = compute_all_gain_circles()
+    print("\n=== Gain circle verification (max |error| in dB) ===")
+    for name, raw in ALL_DEVICE_S_PARAMS.items():
+        S = get_complex_s_params(raw)
+        data = gain_results[name]
+        for circ in data["gain_circles"]:
+            if circ["valid"] and circ["center"] is not None and circ["radius"] is not None:
+                err = verify_gain_circle(S, circ["ga_dB"], circ["center"], circ["radius"])
+                print(f"  {name} G_A={circ['ga_dB']} dB: max error = {err:.4f} dB")
