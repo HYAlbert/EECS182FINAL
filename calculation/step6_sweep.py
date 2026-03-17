@@ -54,7 +54,7 @@ ANG_STEP_DEG = 10
 # Requirements / flags
 GA_DB_MIN = 18.0
 NF_DB_MAX = NOISE_FIGURE_DB_MAX
-VSWR_IN_MAX = 3.0  # transistor-plane input VSWR metric
+VSWR_IN_MAX = 3.0  # transistor-plane input VSWR metric (informational; not an external-port spec)
 STAB_MARGIN_MIN = 0.05
 
 OUTPUT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "documentation"))
@@ -99,7 +99,6 @@ class SweepRow:
         return (
             self.pass_ga
             and self.pass_nf
-            and self.pass_vswr_in
             and self.pass_margin_in
             and self.pass_margin_out
         )
@@ -509,13 +508,13 @@ def sweep_device(device_name: str = DEFAULT_DEVICE_NAME) -> list[SweepRow]:
 def rank_feasible(rows: list[SweepRow]) -> list[SweepRow]:
     feasible = [r for r in rows if r.feasible]
 
-    # Ranking priority:
-    # 1) larger stability margins (min of in/out)
-    # 2) lower NF
-    # 3) higher gain
+    # Ranking priority (available-gain framework):
+    # 1) higher available gain
+    # 2) lower noise figure
+    # 3) larger stability margins (min of in/out)
     def key(r: SweepRow) -> tuple[float, float, float]:
         min_margin = min(r.margin_in, r.margin_out)
-        return (min_margin, -r.nf_db, r.ga_db)
+        return (r.ga_db, -r.nf_db, min_margin)
 
     return sorted(feasible, key=key, reverse=True)
 
@@ -735,93 +734,51 @@ def write_joint_csv_path(rows: list[JointRow], path: str) -> None:
 
 
 def main() -> None:
-    for device_name in ("NE7684A", "NE7684C"):
-        print(f"=== {device_name} joint GammaS-GammaL sweep (GA-ranked) ===")
-        rows = sweep_joint(device_name, mag_step=0.05, ang_step_deg=10.0)
-        joint_csv = _joint_csv_path(device_name)
-        write_joint_csv_path(rows, joint_csv)
-        ranked = rank_joint_feasible(rows)
+    device_name = "NE7684A"
+    print(f"=== {device_name} Step 6 sweep (available-gain framework) ===")
 
-        print(f"Wrote joint CSV: {joint_csv}")
-        print(f"Total joint rows: {len(rows)}")
-        print(f"Feasible rows: {len(ranked)}")
+    rows = sweep_device(device_name)
+    coarse_csv = _csv_path(device_name)
+    write_csv_path(rows, coarse_csv)
+    ranked = rank_feasible(rows)
+    print(f"Wrote coarse CSV: {coarse_csv}")
+    print(f"Total coarse rows: {len(rows)}")
+    print(f"Feasible rows (GA/NF/margins): {len(ranked)}")
 
-        if not ranked:
-            print("No feasible points found on coarse joint grid.")
-            # For NE7684C, also try a targeted Γin sweep in a promising region.
-            if device_name == "NE7684C":
-                gin_target = complex(0.35, 0.25)
-                gin_tol = 0.05
-                print(
-                    f"Trying targeted sweep around Gamma_in ~= ({gin_target.real:.2f},{gin_target.imag:.2f}j) "
-                    f"with |delta_Gamma_in| <= {gin_tol:.2f}"
-                )
-                targeted = sweep_joint_target_gamma_in(
-                    device_name=device_name,
-                    gamma_in_target=gin_target,
-                    gamma_in_tol=gin_tol,
-                    mag_step=0.02,
-                    ang_step_deg=5.0,
-                )
-                target_csv = os.path.join(OUTPUT_DIR, f"{device_name}_step6_joint_target_gammain.csv")
-                write_joint_csv_path(targeted, target_csv)
-                target_ranked = rank_joint_feasible(targeted)
-                print(f"Wrote targeted joint CSV: {target_csv}")
-                print(f"Total targeted rows: {len(targeted)}")
-                print(f"Feasible targeted rows: {len(target_ranked)}")
-                if target_ranked:
-                    tb = target_ranked[0]
-                    print(
-                        f"Best targeted feasible: "
-                        f"GammaS=({tb.gamma_s.real:.4f},{tb.gamma_s.imag:.4f}j) "
-                        f"GammaL=({tb.gamma_l.real:.4f},{tb.gamma_l.imag:.4f}j) "
-                        f"GA={tb.ga_db:.2f} dB GT={tb.gt_db:.2f} dB NF={tb.nf_db:.2f} dB VSWR_IN={tb.vswr_in:.2f} "
-                        f"m_in={tb.margin_in:.3f} m_out={tb.margin_out:.3f}"
-                    )
-            continue
+    if not ranked:
+        print("No feasible points found on coarse grid.")
+        return
 
-        best = ranked[0]
+    best = ranked[0]
+    print(
+        "Best coarse feasible:\n"
+        f"  Gamma_S* = ({best.gamma_s.real:+.6f}{best.gamma_s.imag:+.6f}j)\n"
+        f"  Gamma_L* = ({best.gamma_l.real:+.6f}{best.gamma_l.imag:+.6f}j)  (conj Gamma_out)\n"
+        f"  G_A = {best.ga_db:.3f} dB,  NF = {best.nf_db:.3f} dB\n"
+        f"  stability margins: m_in = {best.margin_in:.3f},  m_out = {best.margin_out:.3f}\n"
+        f"  device-plane VSWR_IN (info) = {best.vswr_in:.3f}"
+    )
+
+    refined = refine_around_point(
+        device_name=device_name,
+        center_point=best.gamma_s,
+        half_width=0.04,
+        step=0.002,
+    )
+    refined_csv = _refined_csv_path(device_name)
+    write_csv_path(refined, refined_csv)
+    refined_ranked = rank_feasible(refined)
+    print(f"Wrote refined CSV: {refined_csv}")
+    if refined_ranked:
+        rb = refined_ranked[0]
         print(
-            f"Best coarse feasible: "
-            f"GammaS=({best.gamma_s.real:.4f},{best.gamma_s.imag:.4f}j) "
-            f"GammaL=({best.gamma_l.real:.4f},{best.gamma_l.imag:.4f}j) "
-            f"GA={best.ga_db:.2f} dB GT={best.gt_db:.2f} dB NF={best.nf_db:.2f} dB VSWR_IN={best.vswr_in:.2f} "
-            f"m_in={best.margin_in:.3f} m_out={best.margin_out:.3f}"
+            "Best refined feasible:\n"
+            f"  Gamma_S* = ({rb.gamma_s.real:+.6f}{rb.gamma_s.imag:+.6f}j)\n"
+            f"  Gamma_L* = ({rb.gamma_l.real:+.6f}{rb.gamma_l.imag:+.6f}j)\n"
+            f"  G_A = {rb.ga_db:.3f} dB,  NF = {rb.nf_db:.3f} dB\n"
+            f"  stability margins: m_in = {rb.margin_in:.3f},  m_out = {rb.margin_out:.3f}\n"
+            f"  device-plane VSWR_IN (info) = {rb.vswr_in:.3f}"
         )
-
-        # Local refinement around best coarse point
-        raw_s = ALL_DEVICE_S_PARAMS[device_name]
-        S = get_complex_s_params(raw_s)
-        noise_params = ALL_DEVICE_NOISE_PARAMS_1GHZ[device_name]
-        stability = compute_all_stability_circles()[device_name]
-        mu1, mu2 = compute_edwards_sinsky_mu(S)
-
-        refined = []
-        for re_s in [best.gamma_s.real + i * 0.01 for i in range(-5, 6)]:
-            for im_s in [best.gamma_s.imag + j * 0.01 for j in range(-5, 6)]:
-                gs = complex(re_s, im_s)
-                if abs(gs) >= 1:
-                    continue
-                for re_l in [best.gamma_l.real + i * 0.01 for i in range(-5, 6)]:
-                    for im_l in [best.gamma_l.imag + j * 0.01 for j in range(-5, 6)]:
-                        gl = complex(re_l, im_l)
-                        if abs(gl) >= 1:
-                            continue
-                        refined.append(_compute_joint_row(S, noise_params, stability, mu1, mu2, gs, gl))
-
-        refined_csv = _joint_refined_csv_path(device_name)
-        write_joint_csv_path(refined, refined_csv)
-        refined_ranked = rank_joint_feasible(refined)
-        print(f"Wrote refined CSV: {refined_csv}")
-        if refined_ranked:
-            rb = refined_ranked[0]
-            print(
-                f"Best refined feasible: "
-                f"GammaS=({rb.gamma_s.real:.4f},{rb.gamma_s.imag:.4f}j) "
-                f"GammaL=({rb.gamma_l.real:.4f},{rb.gamma_l.imag:.4f}j) "
-                f"GA={rb.ga_db:.2f} dB GT={rb.gt_db:.2f} dB NF={rb.nf_db:.2f} dB VSWR_IN={rb.vswr_in:.2f} "
-                f"m_in={rb.margin_in:.3f} m_out={rb.margin_out:.3f}"
-            )
 
 
 if __name__ == "__main__":

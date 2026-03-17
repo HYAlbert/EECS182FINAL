@@ -27,7 +27,7 @@ Goal: Select a suitable device among the 3 provided in the data sheet to design 
 9. Use two separate Smith's charts to design the input and output matching networks. Use balanced open stubs having characteristic impedance of $100\,\Omega$ in combination with transmission line to design the matching circuit.
 10. Realize your matching circuits in MIC technology using microstrip lines for the matching stub. use open stubs having impedance of $100\,\Omega$. Use Rogers as substrate ($\varepsilon_r = 4$, $h = 0.254\,\text{mm}$) and 201 form factor for the passive components (see Fig. 2) for the bias circuit and the decoupling network.
 11. Design the bias network for the device including the decupling capacitors as follow:
-    - Use High/Low impedance ($200\,\Omega / 20\,\Omega$) quarter wave line/stub configuration to provide the bias to the gate and drain of the device, the source should be connected to ground trough a via hole.
+    - Use High/Low impedance ($200\,\Omega / 20\,\Omega$) quarter wave line/stub configuration to provide the bias to the gate and drain of the device, the source should be connected to ground through a via hole.
     - Assume differential voltage $V_{CC} = +5\,\text{V} / -5\,\text{V}$ supply is available for the bias of the device.
     - You can assume no current on the gate ($I_G \sim 0$) of the device when biasing the gate ($V_{GS}$), determine the value of the resistors $R1$ and $R2$.
     - Use the I-V curve in the data sheet and draw the proper load line to calculate the resistors $R3$ needed to bias the drain ($V_{DS}$).
@@ -38,7 +38,6 @@ Goal: Select a suitable device among the 3 provided in the data sheet to design 
 14. If your design cannot meet all the requirements explain why, discuss what you learn during this project and explain your tradeoffs.
 
 ![SMD\_dimensions](documentation/SMD_dimensions.jpg)
-![design\_curves](documentation/design_curves.jpg)
 
 Device Specs:
 
@@ -80,7 +79,7 @@ At 1 GHz, I evaluate all three devices by:
 
 - Checking stability and plotting input/output stability circles (with required stability margins).
 - Plotting available-gain circles and NF circles in the $\Gamma_S$ plane to see whether the gain/noise/stability constraints can overlap.
-- Selecting the most feasible device, then performing a joint $\Gamma_S$–$\Gamma_L$ termination sweep to satisfy the **hard** specs (gain, NF, stability margins, and the critical input VSWR constraint).
+- Selecting the most feasible device, then sweeping `Gamma_S` and using the corresponding conjugate-match load (`Gamma_L = conj(Gamma_out(Gamma_S))`) to meet the **hard** specs (G_A, NF, and stability margins).
 - Synthesizing microstrip matching networks to present the selected `Gamma_S*` and `Gamma_L*` while meeting the **external-port** VSWR requirements.
 
 Step 2: Stability Analysis
@@ -243,30 +242,17 @@ Step 6: Device Tuning
 
 ### Device Tuning Sweep
 
-For the selected device (**NE7684A**) at 1 GHz, I perform a **joint device-plane sweep** over both `Gamma_S` and `Gamma_L` to find a termination pair that satisfies the hard requirements on gain, noise, stability margin, and input VSWR.
+For the selected device (**NE7684A**) at 1 GHz, I sweep `Gamma_S` over the stable region and use the **available-gain (conjugate-match) framework** consistently:
 
-#### Why the sweep must be joint
-If I force `Gamma_L = Gamma_out*` (the available-gain assumption used for Step 3 circles), I may get high gain but not the best input match. Because the **external input VSWR spec is critical** (`VSWR_IN < 3:1`), I tune `Gamma_S` and `Gamma_L` jointly so the terminated device can simultaneously meet gain/noise while keeping `|Gamma_in|` small enough.
+- For each candidate `Gamma_S`, compute the output reflection coefficient `Gamma_out(Gamma_S)` of the transistor.
+- Set the load termination to the **corresponding conjugate-match load**:
+  - `Gamma_L = conj(Gamma_out(Gamma_S))`
+- Evaluate the design metrics at that point:
+  - available gain `G_A(Gamma_S)` (must exceed 18 dB)
+  - noise figure `NF(Gamma_S)` (must be ≤ 1.7 dB)
+  - input/output stability margins (must both be ≥ 0.05)
 
-#### Device-plane input VSWR check
-For each candidate `Gamma_L`, I compute the terminated two-port input reflection coefficient:
-
-$$
-\Gamma_{in}=S_{11}+\frac{S_{12}S_{21}\Gamma_L}{1-S_{22}\Gamma_L}
-$$
-
-Then I compute the corresponding device-plane input VSWR:
-
-$$
-VSWR_{IN,device}=\frac{1+|\Gamma_{in}|}{1-|\Gamma_{in}|}
-$$
-
-During Step 6 I require `VSWR_IN_device < 3` as a feasibility check. The final **external-port** VSWR requirements are still verified after synthesizing the matching networks in later steps.
-
-#### Gain and noise metrics
-- **Gain constraint:** because Step 6 varies *both* terminations, I enforce the gain requirement using the transducer gain `GT(Gamma_S, Gamma_L)` of the terminated two-port.
-- **Noise constraint:** I enforce `NF(Gamma_S) <= 1.7 dB` using the device noise parameters.
-- **Link to Step 3 plots:** I still use the available-gain circles (Step 3) as a visualization aid in the `Gamma_S` plane, but the joint sweep feasibility is evaluated with `GT`.
+Note: I still compute a **device-plane** input VSWR based on `Gamma_in`, but this is an informational transistor-plane metric. The project’s VSWR requirement applies to the **external amplifier input port**, which is verified after the matching network is synthesized in Step 9.
 
 #### Stability margins
 I enforce the stability margin constraints using signed distance to the stability-circle boundaries in both planes:
@@ -275,70 +261,62 @@ I enforce the stability margin constraints using signed distance to the stabilit
 with the requirement that both margins are $\ge 0.05$.
 
 #### Sweep and refinement outputs
-I run a coarse joint sweep over stable regions and then refine locally around the best feasible point.
+I run a coarse `Gamma_S` sweep and then refine locally around the best feasible point (ranked by higher `G_A`, then lower `NF`, then larger minimum stability margin).
 
 Outputs are saved as:
-- `documentation/NE7684A_step6_joint_sweep.csv`
-- `documentation/NE7684A_step6_joint_refined.csv`
-- `documentation/NE7684C_step6_joint_sweep.csv`
+- `documentation/NE7684A_step6_sweep.csv`
+- `documentation/NE7684A_step6_refined_sweep.csv`
 
-All feasible points satisfy the hard constraints (gain > 18 dB, NF <= 1.7 dB, `VSWR_IN_device < 3`, and stability margins >= 0.05). Since stability is enforced as a hard constraint, I rank feasible points primarily by **gain**, then **noise figure**, then **VSWR**:
+All feasible points satisfy the hard constraints (G_A > 18 dB, NF ≤ 1.7 dB, and stability margins ≥ 0.05). I rank feasible points primarily by **higher G_A**, then **lower NF**, then **larger minimum stability margin**.
 
-1. higher gain
-2. lower NF
-3. lower `VSWR_IN_device`
-
-**NE7684A best coarse feasible point (ranked):**
-- `Gamma_S` ≈ -0.2500 + j0.4330
-- `Gamma_L` ≈ 0.9356 - j0.1650
-- gain ≈ 21.16 dB, NF ≈ 1.63 dB, `VSWR_IN_device` ≈ 2.40
-- stability margins: `m_in` ≈ 0.319, `m_out` ≈ 1.488
-
-**NE7684A best refined feasible point (ranked):**
-- `Gamma_S` ≈ -0.2600 + j0.4530
-- `Gamma_L` ≈ 0.9856 - j0.1650
-- gain ≈ 21.32 dB, NF ≈ 1.70 dB, `VSWR_IN_device` ≈ 2.35
-- stability margins: `m_in` ≈ 0.301, `m_out` ≈ 1.528
-
-#### Comparison to NE7684C
-
-I repeated the same coarse joint $\Gamma_S$–$\Gamma_L$ sweep for **NE7684C** under the same hard constraints. On the coarse grid, **NE7684C produced no feasible points**, meaning it could not simultaneously satisfy the gain, noise, VSWR, and stability-margin constraints at 1 GHz. Device C is not an attractive design choice because the overlap between the low-noise region and the required available-gain region is very limited in the $\Gamma_S$ plane, and the corresponding $\Gamma_L$ choices are further constrained by the output stability circle. Therefore, satisfying gain, NF, and both stability-margin requirements simultaneously is difficult, making Device C unsuitable compared with the better alternatives.
-
-This confirms that **NE7684C has worse Step 6 tuning feasibility than NE7684A** under the project specifications.
+**NE7684A best refined feasible point (selected):**
+- `Gamma_S*` ≈ -0.198111 + j0.480831
+- `Gamma_L*` ≈ -0.490536 + j0.429297 (computed as `conj(Gamma_out(Gamma_S*))`)
+- `G_A` ≈ 20.673 dB, `NF` ≈ 1.408 dB
+- stability margins: `m_in` ≈ 0.343, `m_out` ≈ 0.050
 
 Step 7: Select the optimum input Gamma_S
 
 ### Definition of “optimum” and hard constraints
 Here I use `Gamma_S` (same as `Gamma_s` in the project statement) to denote the source/input reflection coefficient. The optimum `Gamma_S` is selected from the feasible region in the `Gamma_S` plane that simultaneously satisfies:
 
-- **Gain**: `GT(Gamma_S, Gamma_L) > 18 dB`
+- **Gain**: `G_A(Gamma_S) > 18 dB`
 - **Noise**: `NF(Gamma_S) <= 1.7 dB`
 - **Input-plane stability margin**: `m_in >= 0.05` (per the stability-margin construction in Step 2)
-- **Critical input mismatch feasibility (device plane):** `VSWR_IN_device < 3` (equivalently `|Gamma_in| < 0.5`)
-
-Since `Gamma_in` depends on `Gamma_L`, this selection is based on the **joint** `Gamma_S`–`Gamma_L` feasible set computed in Step 6. Among feasible points (all hard constraints met), I rank candidates by: (1) higher gain, then (2) lower NF, then (3) lower `VSWR_IN_device`.
+- **Output-plane stability margin (with conjugate match load)**: `m_out >= 0.05` when `Gamma_L = conj(Gamma_out(Gamma_S))`
 
 ### Selected optimum Gamma_S
-From the refined joint sweep for **NE7684A**, the optimum input termination is:
+From the refined available-gain sweep for **NE7684A**, the selected optimum input termination is:
 
-- `Gamma_S*` ≈ -0.2600 + j0.4530
+- `Gamma_S*` ≈ -0.198111 + j0.480831
 
 At this point the design meets all hard constraints:
-- gain ≈ 21.32 dB
-- NF ≈ 1.70 dB
-- `VSWR_IN_device` ≈ 2.35 (i.e., `|Gamma_in| < 0.5`)
-- input stability margin: `m_in` ≈ 0.301 >= 0.05
+- `G_A` ≈ 20.673 dB
+- `NF` ≈ 1.408 dB
+- stability margins: `m_in` ≈ 0.343 >= 0.05, `m_out` ≈ 0.050 >= 0.05
 
 Step 8: Select the corresponding Gamma_L and verify stability requirements
 
-The corresponding output termination for the selected `Gamma_S*` (from the same refined feasible optimum) is:
+Under the available-gain (conjugate-match) framework, the corresponding load is computed from:
 
-- `Gamma_L*` ≈ 0.9856 - j0.1650
+$$
+\Gamma_{out}=S_{22}+\frac{S_{12}S_{21}\Gamma_S}{1-S_{11}\Gamma_S}
+$$
+
+and
+
+$$
+\Gamma_L^\star=\Gamma_{out}^\*
+$$
+
+So the corresponding output termination for the selected `Gamma_S*` is:
+
+- `Gamma_L*` ≈ -0.490536 + j0.429297
 
 ### Output-plane stability margin verification
 Using the output stability circle and margin circle defined in Step 2, `Gamma_L*` must lie in the **stable region** and satisfy the required stability margin:
 
-- output stability margin: $m_{out}\approx 1.528\ge 0.05$
+- output stability margin: `m_out` ≈ 0.050 >= 0.05
 
 ### Note on the VSWR_OUT = 1:1 requirement
 The project requirement `VSWR_OUT = 1:1` is an **external-port** requirement. In Steps 9–10, the output matching network will be synthesized to present the device with `Gamma_L*` while maintaining a matched 50-ohm output port.
@@ -347,11 +325,11 @@ The project requirement `VSWR_OUT = 1:1` is an **external-port** requirement. In
 At 1 GHz with $Z_0=50\,\Omega$, the selected reflection coefficients correspond to the following target impedances at the device reference planes:
 
 $$
-Z_S^\star = Z_0\frac{1+\Gamma_S^\star}{1-\Gamma_S^\star}\approx (20.3 + j25.3)\,\Omega
+Z_S^\star = Z_0\frac{1+\Gamma_S^\star}{1-\Gamma_S^\star}\approx (21.89 + j28.85)\,\Omega
 $$
 
 $$
-Z_L^\star = Z_0\frac{1+\Gamma_L^\star}{1-\Gamma_L^\star}\approx (2.50 - j602)\,\Omega
+Z_L^\star = Z_0\frac{1+\Gamma_L^\star}{1-\Gamma_L^\star}\approx (11.95 + j17.84)\,\Omega
 $$
 
 Per the project constraint, I implement both matching networks using a **50 $\Omega$ through line** and **balanced open stubs** with characteristic impedance **$Z_{0,stub}=100\,\Omega$**. “Balanced” means **two identical 100 $\Omega$ open stubs in parallel at the same shunt node** (symmetric layout, doubled susceptance).
@@ -374,6 +352,7 @@ $$
 y_{eq}=j\tan(\theta)
 $$
 This is equivalent (in normalized admittance) to a **single 50 $\Omega$ open stub** at the same electrical length.
+For Smith-chart synthesis, this balanced 2×100 $\Omega$ stub pair is treated as an **ideal equivalent shunt susceptance** at the shunt node.
 
 ### Distributed matching network form used in Step 9
 On each Smith chart I use a distributed two-element form that is directly realizable with microstrip:
@@ -384,41 +363,46 @@ On each Smith chart I use a distributed two-element form that is directly realiz
 This provides the same degrees of freedom as an L-match, but implemented with the required **50 $\Omega$ line + balanced 100 $\Omega$ open stubs**.
 
 #### Verification notes (constraints carried forward)
-- **Device-plane feasibility (chosen terminations):** verify `|Gamma_in(Gamma_L*)| < 0.5` (equivalently `VSWR_IN_device < 3`).
-- **Output-plane stability margin:** verify `Gamma_L*` satisfies the Step 2 margin requirement in the `Gamma_L` plane (already `m_out` ≈ 1.528 for the selected point).
+- **Device-plane check (informational):** compute the loaded-device `Gamma_in` and device-plane VSWR as an informational metric (not the external-port spec).
+- **Output-plane stability margin:** verify `Gamma_L*` satisfies the Step 2 margin requirement in the `Gamma_L` plane (for the selected point, `m_out` ≈ 0.050).
 - **External-port match (after synthesis):** verify `VSWR_IN < 3:1` and `VSWR_OUT = 1:1` at the external 50-ohm ports for the full network.
 
 Step 9: Smith-chart design of the input and output matching networks
 
-To synthesize the matching networks, I use **two separate Smith charts** (one in the Gamma_S plane for the input match and one in the Gamma_L plane for the output match). Each chart shows the target reflection coefficient at 1 GHz (from Step 7–8) and one matching trajectory realizable with the required **series 50-ohm line section(s)** and **shunt balanced 2×100-ohm open stubs**.
+To synthesize the matching networks, I use **two separate Smith charts** (one in the Gamma_S plane for the input match and one in the Gamma_L plane for the output match). Each chart shows the target reflection coefficient at 1 GHz (from Step 7–8) and one matching trajectory realizable with the required **series 50-ohm line** and **shunt balanced 2×100-ohm open stubs**.
 
-**Input (gate) Smith chart (Gamma_S plane):** the trajectory uses a **50-ohm series line** and a **balanced shunt open-stub pair (2× 100-ohm)** to transform from the 50-ohm port to `Gamma_S*`. (The shunt element is symmetric by construction because the two stubs are identical.) One valid electrical-length solution at 1 GHz is:
+#### Correct single-shunt-stub synthesis sequence
+For a single shunt-stub match, the synthesis is done from the **target plane** back toward the 50-ohm port:
 
-- series 50-ohm line before stubs: theta_1 = 0 degrees
-- each 100-ohm open stub: theta_s ≈ 50.75 degrees  
-- series 50-ohm line after stubs: theta_2 ≈ 59.34 degrees  
+1. Start from the target reflection coefficient (device plane).
+2. Move along a 50-ohm line by `theta_line` until the normalized admittance at the stub node has real part 1:
+   - `y(theta_line) = 1 + j*b`
+3. Add the balanced open-stub pair (normalized susceptance `+j*tan(theta_stub)`) to cancel the imaginary part:
+   - choose `tan(theta_stub) = -b`
+4. The external port is then matched (Gamma ≈ 0, VSWR ≈ 1:1 for the ideal lossless network).
 
-With the balanced pair, the normalized shunt susceptance at the shunt node is approximately j(1.224).
+**Input (gate) Smith chart (Gamma_S plane):** one valid electrical-length solution at 1 GHz is:
 
-Equivalent shunt capacitance at 1 GHz (balanced pair):
-- tan(theta_s) ≈ 1.224
-- B ≈ 1.224 · (1/50) S ≈ 0.0245 S
-- C_eq ≈ 3.9 pF total (about 1.95 pF per 100-ohm stub)
+- series 50-ohm line before stub node: theta_port = 0.00 degrees
+- series 50-ohm line from stub node to device: theta_line ≈ 116.87 degrees
+- each 100-ohm open stub: theta_stub ≈ 129.39 degrees
+
+Equivalent lumped element at 1 GHz (balanced pair at the stub node):
+- tan(theta_stub) ≈ -1.2178 → `B_total` ≈ -0.02436 S
+- This corresponds to an **inductive** shunt element at 1 GHz:
+  - `L_eq` ≈ 6.53 nH total (about 13.07 nH per 100-ohm stub)
 
 ![NE7684A Step 9 Input Smith Chart](documentation/NE7684A_step9_input_smith.jpg)
 
-**Output (drain) Smith chart (Gamma_L plane):** the trajectory uses the same building blocks (50-ohm series line + balanced 2×100-ohm open-stub shunt node) to present `Gamma_L*` at the device plane while keeping the external output port matched to 50 ohm. One valid electrical-length solution at 1 GHz is:
+**Output (drain) Smith chart (Gamma_L plane):** one valid electrical-length solution at 1 GHz is:
 
-- series 50-ohm line before stubs: theta_1 = 0 degrees (arbitrary here since the start point is Gamma = 0)  
-- each 100-ohm open stub: theta_s ≈ 89.00 degrees  
-- series 50-ohm line after stubs: theta_2 ≈ 95.75 degrees  
+- series 50-ohm line before stub node: theta_port = 0.00 degrees
+- series 50-ohm line from stub node to device: theta_line ≈ 4.07 degrees
+- each 100-ohm open stub: theta_stub ≈ 59.81 degrees
 
-This output match is very reactive/high-Q (the target `Gamma_L*` is close to the unit circle), so the stub length lands close to a quarter wavelength and the result will be more layout-sensitive and narrowband than the input match.
-
-Equivalent shunt capacitance at 1 GHz (balanced pair):
-- tan(theta_s) ≈ tan(89.00 degrees) ≈ 57.3
-- B ≈ 57.3 · (1/50) S ≈ 1.146 S
-- C_eq ≈ 182 pF total (about 91 pF per 100-ohm stub)
+Equivalent lumped element at 1 GHz (balanced pair at the stub node):
+- tan(theta_stub) ≈ +1.7190 → `B_total` ≈ +0.03438 S
+- `C_eq` ≈ 5.47 pF total (about 2.74 pF per 100-ohm stub)
 
 ![NE7684A Step 9 Output Smith Chart](documentation/NE7684A_step9_output_smith.jpg)
 
@@ -426,13 +410,28 @@ Step 10 (handoff): MIC realization of the Step 9 microstrip sections
 
 In Step 10, I convert the Step 9 electrical lengths to **physical microstrip lengths** on Rogers substrate ($\varepsilon_r=4$, $h=0.254\,\text{mm}$) using the provided microstrip design curves:
 
+![design\_curves](documentation/design_curves.jpeg)
+
 - **Determine widths** from the design curves:
   - $W_{50}$ for a 50 $\Omega$ microstrip line (through line sections)
   - $W_{100}$ for a 100 $\Omega$ microstrip line (each open stub)
+- **Design-curve results used (at $\varepsilon_r=4$)**:
+  - 50-ohm microstrip: `W/h ≈ 1.1`, lambda ratio ≈ 1.15
+  - 100-ohm microstrip: `W/h ≈ 0.6`, lambda ratio ≈ 1.2
 - **Determine guided wavelength** for each impedance class (because $W/h$ differs):
   - $\lambda_{g,50}$ for the 50 $\Omega$ line
   - $\lambda_{g,100}$ for the 100 $\Omega$ stub line
 - **Convert electrical length to physical length**:
+
+$$
+\lambda_0=\frac{c}{f},\qquad \lambda_{TEM}=\frac{\lambda_0}{\sqrt{\varepsilon_r}}
+$$
+
+The design-curve “lambda ratio” is given as $\lambda/\lambda_{TEM}$, so:
+
+$$
+\lambda_g=\lambda=\left(\frac{\lambda}{\lambda_{TEM}}\right)\lambda_{TEM}=\left(\text{lambda ratio}\right)\frac{\lambda_0}{\sqrt{\varepsilon_r}}
+$$
 
 $$
 l=\frac{\theta}{2\pi}\,\lambda_g
@@ -440,3 +439,72 @@ $$
 
 Using $\lambda_{g,50}$ for the 50 $\Omega$ sections ($\theta_1$, $\theta_2$) and $\lambda_{g,100}$ for each 100 $\Omega$ open stub ($\theta_s$).
 
+#### Numeric lengths at 1 GHz (h = 0.254 mm, epsilon_r = 4)
+At 1 GHz, $\lambda_0 = 300$ mm and $\lambda_{TEM}=\lambda_0/\sqrt{\varepsilon_r}=300/2=150$ mm. Using the design-curve lambda ratios ($\lambda/\lambda_{TEM}$):
+- 50-ohm line: $\lambda_{g,50} \approx 1.15\cdot 150 = 172.50$ mm
+- 100-ohm stub: $\lambda_{g,100} \approx 1.2\cdot 150 = 180.00$ mm
+
+Using the Step 9 electrical lengths:
+
+- Input match (50-ohm line from stub node to device, theta_line ≈ 116.87°):
+  - length ≈ (116.87/360)·172.50 mm ≈ **56.00 mm**
+- Input match (each 100-ohm open stub, theta_stub ≈ 129.39°):
+  - length ≈ (129.39/360)·180.00 mm ≈ **64.70 mm**
+
+- Output match (50-ohm line from stub node to device, theta_line ≈ 4.07°):
+  - length ≈ (4.07/360)·172.50 mm ≈ **1.95 mm**
+- Output match (each 100-ohm open stub, theta_stub ≈ 59.81°):
+  - length ≈ (59.81/360)·180.00 mm ≈ **29.90 mm**
+
+Step 11: Bias network (high/low impedance quarter-wave feed, DC bias resistors, and decoupling)
+
+The bias network must provide DC gate and drain bias while isolating the RF path. The project specifies a high/low impedance quarter-wave configuration using 200-ohm / 20-ohm microstrip sections, plus a resistive gate divider, a drain bias resistor from the +5 V rail, and choke/decoupling components.
+
+### Gate bias (R1, R2) using +5 V / -5 V rails
+From the I-V curve, I estimate a gate-source bias of approximately:
+- VGS ~ -0.47 V (estimated between the -0.4 V and -0.6 V curves)
+![IV\_curve](documentation/IV_curve.jpg)
+
+Assuming IG ~ 0, I set the gate voltage using a divider between +5 V and -5 V:
+- R1 from +5 V to the gate node
+- R2 from the gate node to -5 V
+
+With source at RF ground, the divider target is VG ~ -0.47 V. Given that the supply rails are +5 V and -5 V, and assuming IG ~ 0, the divider relationship is:
+
+- VG = -5 + 10·(R2/(R1+R2))
+
+Solving for VG ~ -0.47 V gives R2/(R1+R2) ~ 0.453, so one practical choice is R1+R2 = 10 kOhm:
+
+- R1 ~ 5.47 kOhm (to +5 V)
+- R2 ~ 4.53 kOhm (to -5 V)
+- Divider current: Idiv = 10 V / 10 kOhm = 1.00 mA
+- Power: PR1 ~ 5.47 mW, PR2 ~ 4.53 mW
+
+### Drain bias (R3) for VDS = 3 V at ID = 10 mA
+With the drain fed from +5 V through R3 and targeting VDS = 3 V at ID = 10 mA:
+- R3 = (5 - 3)/0.01 = 200 ohm
+- PR3 = ID^2 * R3 = 20 mW
+
+### Choke inductor (LCK) and decoupling capacitor (CDEC) at 1 GHz
+To meet the specified RF-impedance screening at 1 GHz:
+- decoupling capacitor target: |ZC| < 1 ohm
+- choke inductor target: |ZL| > 10 kohm
+
+Using |ZC| = 1/(wC) and |ZL| = wL at f = 1 GHz:
+- CDEC > 1/w = 159.2 pF
+- LCK > 10k/w = 1.592 uH
+
+### Microstrip implementation of 20-ohm / 200-ohm quarter-wave bias sections (formulas, not curves)
+The provided microstrip design curves do not include 200 ohm, so I compute w/h and guided wavelength using closed-form microstrip equations (quasi-TEM). For epsilon_r = 4 and h = 0.254 mm at 1 GHz:
+
+- 20-ohm microstrip:
+  - w/h ~ 7.3437 -> W ~ 1.8653 mm
+  - epsilon_eff ~ 3.4242
+  - lambda_g ~ 162.01 mm -> quarter-wave length ~ 40.50 mm
+
+- 200-ohm microstrip:
+  - w/h ~ 0.0377 -> W ~ 0.0096 mm
+  - epsilon_eff ~ 2.5839
+  - lambda_g ~ 186.50 mm -> quarter-wave length ~ 46.63 mm
+
+These 20-ohm / 200-ohm quarter-wave sections are used to feed the gate and drain bias while providing RF isolation at 1 GHz.

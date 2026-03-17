@@ -41,6 +41,17 @@ class StubMatchSolution:
     err: float  # |Γ_achieved - Γ_target|
 
 
+@dataclass(frozen=True)
+class ShuntStubMatch:
+    theta_port: float  # optional series line before stub (kept at 0) [rad]
+    theta_line: float  # series 50 Ω line from stub node to device [rad]
+    theta_stub: float  # open-stub electrical length (both stubs identical) [rad]
+    gamma_target: complex
+    gamma_at_node: complex
+    y_at_node: complex
+    gamma_port: complex
+
+
 def gamma_from_z(z: complex) -> complex:
     return (z - 1) / (z + 1)
 
@@ -138,6 +149,155 @@ def cascade_series_then_shunt_then_series(
     g3 = apply_series_line(g2, theta2)
     return g3
 
+def _line_transform_admittance(y_load: complex, theta: float) -> complex:
+    """
+    Normalized admittance transform along a lossless Z0 line by electrical length theta
+    (toward the generator):
+
+      y_in = (y_L + j*tan(theta)) / (1 + j*y_L*tan(theta))
+    """
+    t = math.tan(theta)
+    return (y_load + 1j * t) / (1 + 1j * y_load * t)
+
+
+def solve_shunt_stub_from_target(
+    gamma_target: complex,
+    theta_samples: int = 20001,
+    re_tol: float = 5e-4,
+) -> ShuntStubMatch:
+    """
+    Correct single-shunt-stub synthesis (balanced 2×100 Ω open stubs) from the target plane.
+
+    Topology (port -> device):
+      (optional series line theta_port, set to 0)
+        -> shunt stub node
+        -> series 50 Ω line theta_line
+        -> device plane target Gamma
+
+    Solve for theta_line such that the transformed admittance at the stub node has Re(y)=1,
+    then choose theta_stub so that the stub susceptance cancels Im(y).
+    """
+    z_load = z_from_gamma(gamma_target)
+    y_load = 1 / z_load
+
+    best = None
+    best_key = None
+    for k in range(theta_samples):
+        theta = (math.pi * k) / theta_samples  # [0, pi)
+        y_node = _line_transform_admittance(y_load, theta)
+        re_err = abs(y_node.real - 1.0)
+        if re_err > re_tol:
+            continue
+
+        # Need y_total = 1 + j0, so b_stub = -Im(y_node)
+        b_needed = -y_node.imag
+
+        # Balanced pair contributes +j*tan(theta_stub) (normalized), so tan(theta_stub)=b_needed.
+        theta_stub = math.atan(b_needed) % math.pi
+
+        # Avoid near-open/near-quarter-wave singularities
+        if theta_stub < 1e-4 or abs(theta_stub - math.pi / 2) < 1e-4:
+            continue
+
+        # Compute port match after adding the stub
+        z_node = 1 / y_node
+        z_after = apply_shunt_susceptance(z_node, b_needed)
+        gamma_port = gamma_from_z(z_after)
+
+        cand = ShuntStubMatch(
+            theta_port=0.0,
+            theta_line=theta,
+            theta_stub=theta_stub,
+            gamma_target=gamma_target,
+            gamma_at_node=gamma_target * complex(math.cos(-2 * theta), math.sin(-2 * theta)),
+            y_at_node=y_node,
+            gamma_port=gamma_port,
+        )
+        # Preference order:
+        # 1) best match (min |Gamma_port|)
+        # 2) shorter line (min(theta, pi-theta))
+        # 3) stub farther from 90 deg singularity
+        line_len = min(theta, math.pi - theta)
+        stub_sing = abs(theta_stub - math.pi / 2)
+        key = (abs(gamma_port), line_len, stub_sing)
+        if best is None or key < best_key:
+            best = cand
+            best_key = key
+
+    if best is None:
+        raise RuntimeError("No shunt-stub solution found for the given target Gamma.")
+    return best
+
+
+def solve_shunt_stub_from_target_second_intersection(
+    gamma_target: complex,
+    theta_samples: int = 20001,
+    re_tol: float = 5e-4,
+    min_sep_deg: float = 20.0,
+) -> tuple[ShuntStubMatch, ShuntStubMatch]:
+    """
+    Return BOTH shunt-stub solutions for a target Gamma (the two Re{y}=1 intersections).
+
+    Implementation approach:
+    - enumerate all theta that satisfy Re(y_node) ~= 1
+    - compute the corresponding stub and port match
+    - cluster solutions into two groups based on theta separation
+    - return (shorter-theta_line solution, longer-theta_line solution)
+    """
+    z_load = z_from_gamma(gamma_target)
+    y_load = 1 / z_load
+
+    cands: list[ShuntStubMatch] = []
+    for k in range(theta_samples):
+        theta = (math.pi * k) / theta_samples  # [0, pi)
+        y_node = _line_transform_admittance(y_load, theta)
+        if abs(y_node.real - 1.0) > re_tol:
+            continue
+
+        b_needed = -y_node.imag
+        theta_stub = math.atan(b_needed) % math.pi
+        if theta_stub < 1e-4 or abs(theta_stub - math.pi / 2) < 1e-4:
+            continue
+
+        z_node = 1 / y_node
+        z_after = apply_shunt_susceptance(z_node, b_needed)
+        gamma_port = gamma_from_z(z_after)
+
+        cands.append(
+            ShuntStubMatch(
+                theta_port=0.0,
+                theta_line=theta,
+                theta_stub=theta_stub,
+                gamma_target=gamma_target,
+                gamma_at_node=gamma_target * complex(math.cos(-2 * theta), math.sin(-2 * theta)),
+                y_at_node=y_node,
+                gamma_port=gamma_port,
+            )
+        )
+
+    if not cands:
+        raise RuntimeError("No shunt-stub solution found for the given target Gamma.")
+
+    # Sort by theta_line and keep only well-matched candidates
+    cands = sorted(cands, key=lambda s: (abs(s.gamma_port), s.theta_line))
+
+    # Pick the best overall as an anchor
+    best = cands[0]
+
+    # Find the best candidate sufficiently separated in theta_line (second intersection)
+    min_sep = math.radians(min_sep_deg)
+    alt = None
+    for s in cands[1:]:
+        if abs(s.theta_line - best.theta_line) >= min_sep:
+            alt = s
+            break
+    if alt is None:
+        # Fallback: pick the farthest theta
+        alt = max(cands, key=lambda s: abs(s.theta_line - best.theta_line))
+
+    short_sol, long_sol = (best, alt) if best.theta_line <= alt.theta_line else (alt, best)
+    return short_sol, long_sol
+
 
 def trajectory_series_then_shunt_then_series(
     theta1: float, theta_stub: float, theta2: float, n_line: int = 220, n_stub: int = 160
@@ -167,6 +327,31 @@ def trajectory_series_then_shunt_then_series(
     g_line2 = g2_end * np.exp(-1j * 2 * th2)
 
     g = np.concatenate([g_line1, g_shunt[1:], g_line2[1:]])
+    return g.real, g.imag
+
+
+def trajectory_target_to_match(
+    gamma_target: complex, theta_line: float, theta_stub: float, n_line: int = 240, n_stub: int = 200
+) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Build Γ trajectory for the correct synthesis direction:
+      start at target Γ (device plane)
+        -> move along series line theta_line toward generator (stub node)
+        -> add shunt stub susceptance to reach Γ=0 (match at the port)
+    """
+    # Move along line toward generator: Γ(θ) = Γ_L * e^{-j2θ}
+    th = np.linspace(0.0, theta_line, n_line)
+    g_line = gamma_target * np.exp(-1j * 2 * th)
+
+    # At stub node, apply shunt susceptance sweep to theta_stub
+    g_node = g_line[-1]
+    z_node = z_from_gamma(g_node)
+    ths = np.linspace(0.0, theta_stub, n_stub)
+    b_eq = np.tan(ths)
+    z_shunt = 1 / ((1 / z_node) + 1j * b_eq)
+    g_shunt = gamma_from_z(z_shunt)
+
+    g = np.concatenate([g_line, g_shunt[1:]])
     return g.real, g.imag
 
 
@@ -233,7 +418,7 @@ def solve_for_target_gamma(
     return best
 
 
-def plot_input_smith(gamma_s_star: complex, sol: StubMatchSolution, outpath: str) -> None:
+def plot_input_smith(gamma_s_star: complex, sol: ShuntStubMatch, outpath: str) -> None:
     fig, ax = plt.subplots(figsize=(8, 8))
     smith_grid(ax)
 
@@ -242,8 +427,8 @@ def plot_input_smith(gamma_s_star: complex, sol: StubMatchSolution, outpath: str
     ax.plot([g50.real], [g50.imag], "ko", ms=6, label=r"$50\,\Omega$ (port)")
     ax.plot([gamma_s_star.real], [gamma_s_star.imag], "r*", ms=12, label=r"$\Gamma_S^\star$")
 
-    x, y = trajectory_series_then_shunt_then_series(sol.theta1, sol.theta_stub, sol.theta2)
-    ax.plot(x, y, "b-", lw=2.0, label="50Ω line → balanced shunt stubs → 50Ω line")
+    x, y = trajectory_target_to_match(gamma_s_star, sol.theta_line, sol.theta_stub)
+    ax.plot(x, y, "b-", lw=2.0, label="target → series line → balanced shunt stubs → match")
 
     ax.set_title(r"Input matching on Smith chart ($\Gamma_S$ plane)")
     ax.legend(loc="lower left", fontsize=9)
@@ -254,7 +439,7 @@ def plot_input_smith(gamma_s_star: complex, sol: StubMatchSolution, outpath: str
     plt.close(fig)
 
 
-def plot_output_smith(gamma_l_star: complex, sol: StubMatchSolution, outpath: str) -> None:
+def plot_output_smith(gamma_l_star: complex, sol: ShuntStubMatch, outpath: str) -> None:
     fig, ax = plt.subplots(figsize=(8, 8))
     smith_grid(ax)
 
@@ -262,8 +447,8 @@ def plot_output_smith(gamma_l_star: complex, sol: StubMatchSolution, outpath: st
     ax.plot([g50.real], [g50.imag], "ko", ms=6, label=r"$50\,\Omega$ (port)")
     ax.plot([gamma_l_star.real], [gamma_l_star.imag], "r*", ms=12, label=r"$\Gamma_L^\star$")
 
-    x, y = trajectory_series_then_shunt_then_series(sol.theta1, sol.theta_stub, sol.theta2)
-    ax.plot(x, y, "b-", lw=2.0, label="50Ω line → balanced shunt stubs → 50Ω line")
+    x, y = trajectory_target_to_match(gamma_l_star, sol.theta_line, sol.theta_stub)
+    ax.plot(x, y, "b-", lw=2.0, label="target → series line → balanced shunt stubs → match")
 
     ax.set_title(r"Output matching on Smith chart ($\Gamma_L$ plane)")
     ax.legend(loc="lower left", fontsize=9)
@@ -275,13 +460,38 @@ def plot_output_smith(gamma_l_star: complex, sol: StubMatchSolution, outpath: st
 
 
 def main() -> None:
-    # Selected terminations (from Step 6 refined optimum)
-    gamma_s_star = complex(-0.2600, 0.4530)
-    gamma_l_star = complex(0.9856, -0.1650)
+    # Selected terminations (available-gain framework):
+    # Choose Gamma_S*, then set Gamma_L* = conj(Gamma_out(Gamma_S*)).
+    #
+    # NOTE: The final numeric values are verified/selected in Step 6.
+    gamma_s_star = complex(-0.198111, 0.480831)
 
-    # Solve for distributed balanced-stub solutions (θ1, θstub, θ2)
-    in_sol = solve_for_target_gamma(gamma_s_star, max_err=5e-3)
-    out_sol = solve_for_target_gamma(gamma_l_star, max_err=5e-3)
+    # Compute corresponding conjugate-match load for the chosen Gamma_S*
+    import sys
+    sys.path.append(os.path.dirname(__file__))
+    import calculations  # noqa: E402
+    import constants  # noqa: E402
+
+    device = "NE7684A"
+    S = calculations.get_complex_s_params(constants.ALL_DEVICE_S_PARAMS[device])
+    gamma_out = calculations.compute_gamma_out(S, gamma_s_star)
+    gamma_l_star = gamma_out.conjugate()
+
+    # Solve BOTH shunt-stub matches (two Re{y}=1 intersections) and pick the shorter-line solution
+    in_short, in_long = solve_shunt_stub_from_target_second_intersection(gamma_s_star)
+    out_short, out_long = solve_shunt_stub_from_target_second_intersection(gamma_l_star)
+    in_sol = in_short
+    out_sol = out_short
+
+    print(f"Gamma_S* = {gamma_s_star.real:+.6f}{gamma_s_star.imag:+.6f}j")
+    print(
+        f"Gamma_out(Gamma_S*) = {gamma_out.real:+.6f}{gamma_out.imag:+.6f}j  "
+        f"|Gamma_out|={abs(gamma_out):.6f}"
+    )
+    print(
+        f"Gamma_L* = conj(Gamma_out) = {gamma_l_star.real:+.6f}{gamma_l_star.imag:+.6f}j  "
+        f"|Gamma_L*|={abs(gamma_l_star):.6f}"
+    )
 
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     plot_input_smith(
@@ -298,24 +508,28 @@ def main() -> None:
     def deg(x: float) -> float:
         return x * 180.0 / math.pi
 
-    def fmt_sol(name: str, sol: StubMatchSolution, gamma_target: complex) -> None:
+    def fmt_sol(name: str, sol: ShuntStubMatch) -> None:
         b_eq = math.tan(sol.theta_stub)
-        # Each 100 Ω stub contributes half the equivalent susceptance when normalized to 50 Ω:
-        # y_total = j*b_eq, so Y_total = j*b_eq/Z0; each stub Y = 0.5*Y_total
-        B_each = 0.5 * (b_eq / Z0)  # Siemens
+        B_total = b_eq / Z0  # Siemens
+        B_each = 0.5 * B_total
         print(f"{name}:")
-        print(f"  target Gamma = {gamma_target.real:+.4f}{gamma_target.imag:+.4f}j")
-        print(f"  achieved Gamma = {sol.gamma_final.real:+.4f}{sol.gamma_final.imag:+.4f}j  (err={sol.err:.4e})")
-        print(f"  theta1 (50 ohm series line before stubs)  = {deg(sol.theta1):.2f} deg")
-        print(f"  theta_stub (each 100 ohm open stub)       = {deg(sol.theta_stub):.2f} deg")
-        print(f"  theta2 (50 ohm series line after stubs)   = {deg(sol.theta2):.2f} deg")
+        print(f"  target Gamma = {sol.gamma_target.real:+.4f}{sol.gamma_target.imag:+.4f}j")
+        print(f"  theta_port (series line before stub) = {deg(sol.theta_port):.2f} deg")
+        print(f"  theta_line (stub node to device)     = {deg(sol.theta_line):.2f} deg")
+        print(f"  theta_stub (each 100-ohm open stub)  = {deg(sol.theta_stub):.2f} deg")
+        print(f"  y_at_node = {sol.y_at_node.real:+.4f}{sol.y_at_node.imag:+.4f}j (should be 1+jb)")
         print(f"  balanced-stub susceptance: y_eq = j*tan(theta_stub) = j*{b_eq:+.4f}")
-        print(f"  each stub susceptance: B_each ~ {B_each:+.6f} S (at 1 GHz)")
+        print(f"  B_total ~ {B_total:+.6f} S,  B_each ~ {B_each:+.6f} S (at 1 GHz)")
+        print(f"  port Gamma after stub = {sol.gamma_port.real:+.6f}{sol.gamma_port.imag:+.6f}j  |Gamma|={abs(sol.gamma_port):.3e}")
 
-    print("Balanced-stub distributed solutions (50 ohm line + 2x100 ohm open stubs in parallel):\n")
-    fmt_sol("INPUT match (Gamma_S plane)", in_sol, gamma_s_star)
+    print("Balanced-stub distributed solutions (two intersections available):\n")
+    fmt_sol("INPUT match (short-line solution)", in_short)
     print()
-    fmt_sol("OUTPUT match (Gamma_L plane)", out_sol, gamma_l_star)
+    fmt_sol("INPUT match (long-line solution)", in_long)
+    print()
+    fmt_sol("OUTPUT match (short-line solution)", out_short)
+    print()
+    fmt_sol("OUTPUT match (long-line solution)", out_long)
 
 
 if __name__ == "__main__":
