@@ -481,7 +481,8 @@ def main() -> None:
     in_short, in_long = solve_shunt_stub_from_target_second_intersection(gamma_s_star)
     out_short, out_long = solve_shunt_stub_from_target_second_intersection(gamma_l_star)
     in_sol = in_short
-    out_sol = out_short
+    # Prefer the long-line output solution to avoid a very short physical line section.
+    out_sol = out_long
 
     print(f"Gamma_S* = {gamma_s_star.real:+.6f}{gamma_s_star.imag:+.6f}j")
     print(

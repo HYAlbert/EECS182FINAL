@@ -397,12 +397,13 @@ Equivalent lumped element at 1 GHz (balanced pair at the stub node):
 **Output (drain) Smith chart (Gamma_L plane):** one valid electrical-length solution at 1 GHz is:
 
 - series 50-ohm line before stub node: theta_port = 0.00 degrees
-- series 50-ohm line from stub node to device: theta_line ≈ 4.07 degrees
-- each 100-ohm open stub: theta_stub ≈ 59.81 degrees
+- series 50-ohm line from stub node to device: theta_line ≈ 134.74 degrees
+- each 100-ohm open stub: theta_stub ≈ 120.19 degrees
 
 Equivalent lumped element at 1 GHz (balanced pair at the stub node):
-- tan(theta_stub) ≈ +1.7190 → `B_total` ≈ +0.03438 S
-- `C_eq` ≈ 5.47 pF total (about 2.74 pF per 100-ohm stub)
+- tan(theta_stub) ≈ -1.7190 → `B_total` ≈ -0.03438 S
+- This corresponds to an **inductive** shunt element at 1 GHz:
+  - `L_eq` ≈ 4.63 nH total (about 9.26 nH per 100-ohm stub)
 
 ![NE7684A Step 9 Output Smith Chart](documentation/NE7684A_step9_output_smith.jpg)
 
@@ -451,10 +452,10 @@ Using the Step 9 electrical lengths:
 - Input match (each 100-ohm open stub, theta_stub ≈ 129.39°):
   - length ≈ (129.39/360)·180.00 mm ≈ **64.70 mm**
 
-- Output match (50-ohm line from stub node to device, theta_line ≈ 4.07°):
-  - length ≈ (4.07/360)·172.50 mm ≈ **1.95 mm**
-- Output match (each 100-ohm open stub, theta_stub ≈ 59.81°):
-  - length ≈ (59.81/360)·180.00 mm ≈ **29.90 mm**
+- Output match (50-ohm line from stub node to device, theta_line ≈ 134.74°):
+  - length ≈ (134.74/360)·172.50 mm ≈ **64.58 mm**
+- Output match (each 100-ohm open stub, theta_stub ≈ 120.19°):
+  - length ≈ (120.19/360)·180.00 mm ≈ **60.10 mm**
 
 Step 11: Bias network (high/low impedance quarter-wave feed, DC bias resistors, and decoupling)
 
@@ -508,3 +509,33 @@ The provided microstrip design curves do not include 200 ohm, so I compute w/h a
   - lambda_g ~ 186.50 mm -> quarter-wave length ~ 46.63 mm
 
 These 20-ohm / 200-ohm quarter-wave sections are used to feed the gate and drain bias while providing RF isolation at 1 GHz.
+
+Part 12: Drawing Layout
+
+![Drawing](documentation/drawing_layout.jpg)
+
+Part 13: Final amplifier circuit and performance tradeoff
+
+**Final topology (1 GHz):**
+- Selected device: NE7684A, biased at VDS = 3 V and ID = 10 mA
+- Input match: 50-ohm line + balanced 2×100-ohm open stubs to present `Gamma_S*` at the device plane and match the external input port
+- Output match: 50-ohm line + balanced 2×100-ohm open stubs to present `Gamma_L*` at the device plane and match the external output port
+- Bias network: gate divider from +5 V / -5 V to set VG ~ -0.47 V, drain resistor R3 = 200 ohm from +5 V, and quarter-wave high/low impedance bias feeds with decoupling/choke components
+
+**Selected terminations (device plane):**
+- `Gamma_S*` ≈ -0.198111 + j0.480831
+- `Gamma_L*` ≈ -0.490536 + j0.429297 (conjugate-match load from `Gamma_out(Gamma_S*)`)
+
+**Key performance at 1 GHz (device-plane metrics):**
+- Available gain: G_A ≈ 20.673 dB (> 18 dB requirement)
+- Noise figure: NF ≈ 1.408 dB (≤ 1.7 dB requirement)
+- Stability margins: m_in ≈ 0.343 and m_out ≈ 0.050 (both ≥ 0.05 requirement)
+
+**Tradeoffs:**
+- The selected point prioritizes meeting the hard gain/NF/stability-margin constraints under the available-gain (conjugate-match) framework.
+- The output stability margin is tight (~0.050), so the final realized layout should preserve electrical lengths accurately to maintain margin.
+
+Part 14: If the design cannot meet all requirements
+
+N/A (design meets the specified requirements).
+
