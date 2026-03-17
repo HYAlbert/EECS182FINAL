@@ -231,22 +231,22 @@ To select the best device, I overlay **gain circles (18–24 dB)**, the **NF = 1
 
 From the combined plots and the provided 1 GHz parameters:
 
-- **NE7684A (selected)**: offers the best tradeoff because it has the **highest forward gain** (largest $|S_{21}|$) and the **lowest $NF_{min}$**. In the $\Gamma_S$ overlay plot there is a clear overlap between the **NF $\le 1.7$ dB** region and the available-gain circles, and the NF boundary extends into part of the **$\sim$21 dB** gain-circle region.
-
 - **NE7684B (rejected)**: is not feasible for the requirements because the **$G_A=18$ dB** gain circle does **not** overlap with the region that satisfies **NF $\le 1.7$ dB**. This means there is no $\Gamma_S$ that meets both the gain and noise requirements at the same time.
 
-- **NE7684C (works but worse)**: can work, but has a **smaller overlap** region and a worse tradeoff. For example, the NF boundary only extends to about the **$\sim$20 dB** gain-circle region. NE7684C also has the **lowest $k$** (least stable), so meeting constraints like **$\mathrm{VSWR}_{IN}$** during tuning is likely harder.
+- **NE7684A (selected)**: offers the best tradeoff because it has the **highest forward gain** (largest $|S_{21}|$) and the **lowest $NF_{min}$**. In the $\Gamma_S$ overlay plot there is a clear overlap between the **NF $\le 1.7$ dB** region and the available-gain circles, and the NF boundary reaches into the **about 21 dB** gain-circle region.
+
+- **NE7684C (works but worse)**: can work, but has a **smaller overlap** region and a worse tradeoff. For example, the NF boundary only reaches into the **about 20 dB** gain-circle region. NE7684C also has the **lowest $k$** (least stable), so meeting constraints like **`VSWR_IN`** during tuning is likely harder.
 
 Therefore I proceed with **NE7684A** for the remaining design steps.
 
 Step 6: Device Tuning
 
-### Device Tuning Sweep (joint $\Gamma_S$–$\Gamma_L$ tradeoffs)
+### Device Tuning Sweep
 
 For the selected device (**NE7684A**) at $1\,\text{GHz}$, I perform a **joint device-plane sweep** over both $\Gamma_S$ and $\Gamma_L$ to find a termination pair that satisfies the hard requirements on gain, noise, stability margin, and input VSWR.
 
 #### Why the sweep must be joint
-Forcing $\Gamma_L=\Gamma_{out}^*$ is a gain-driven (available-gain) assumption and does not generally minimize $|\Gamma_{in}|$. Since $\mathrm{VSWR}_{INPUT}<3{:}1$ is critical, $\Gamma_S$ and $\Gamma_L$ must be tuned together to meet gain/noise while keeping the device-plane input mismatch small enough.
+If I force $\Gamma_L=\Gamma_{out}^\*$ (the available-gain assumption used for Step 3 circles), I may get high gain but not the best input match. Because the **external input VSWR spec is critical** ($\mathrm{VSWR}_{IN}<3{:}1$), I tune $\Gamma_S$ and $\Gamma_L$ jointly so the terminated device can simultaneously meet gain/noise while keeping $|\Gamma_{in}|$ small enough.
 
 #### Device-plane input VSWR check
 For each candidate $\Gamma_L$, I compute the terminated two-port input reflection coefficient
@@ -383,8 +383,8 @@ This provides the same degrees of freedom as an L-match, but implemented with th
 
 #### Verification notes (constraints carried forward)
 - **Device-plane feasibility (chosen terminations):** verify $|\Gamma_{in}(\Gamma_L^\star)|<0.5$ (equivalently $\mathrm{VSWR}_{IN,\text{device}}<3$).
-- **Output-plane stability margin:** $\Gamma_L^\star$ must satisfy the Step 2 margin requirement in the $\Gamma_L$ plane (already $m_{out}\approx 1.528$ for the selected point).
-- **External-port match (after synthesis):** verify $\mathrm{VSWR}_{IN}$ and $\mathrm{VSWR}_{OUT}$ at the external $50\,\Omega$ ports for the full network.
+- **Output-plane stability margin:** verify $\Gamma_L^\star$ satisfies the Step 2 margin requirement in the $\Gamma_L$ plane (already $m_{out}\approx 1.528$ for the selected point).
+- **External-port match (after synthesis):** verify $\mathrm{VSWR}_{IN}<3{:}1$ and $\mathrm{VSWR}_{OUT}=1{:}1$ at the external $50\,\Omega$ ports for the full network.
 
 Step 9: Smith-chart design of the input and output matching networks
 
