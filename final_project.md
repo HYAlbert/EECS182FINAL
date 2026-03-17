@@ -237,7 +237,7 @@ From the combined plots and the provided 1 GHz parameters:
 
 - **NE7684C (maybe works but worse)**: based upon the graph, I think it can possibly work, but has a **smaller overlap** region and a worse tradeoff. For example, the NF boundary only reaches into the **about 20 dB** gain-circle region. NE7684C also has the **lowest $k$** (least stable), so meeting constraints like **`VSWR_IN`** during tuning is likely harder.
 
-Note: in later section I rule out NE7684C with more evidence.
+Note: The Step 5 overlays are only a preliminary screening tool in the source plane. Final device selection must also enforce the output stability-margin constraint after assigning the conjugate-match load, which is done numerically in Step 6
 
 Therefore I proceed with **NE7684A** for the remaining design steps.
 
@@ -255,7 +255,8 @@ For the selected device (**NE7684A**) at 1 GHz, I sweep `Gamma_S` over the stabl
   - noise figure `NF(Gamma_S)` (must be $\leq 1.7$ dB)
   - input/output stability margins (must both be $\geq 0.05$)
 
-Note: I still compute a **device-plane** input VSWR based on `Gamma_in`, but this is an informational transistor-plane metric. The project’s VSWR requirement applies to the **external amplifier input port**, which is verified after the matching network is synthesized in Step 9.
+#### Design objective and selection rule
+I define the design objective as **maximizing available gain** among all feasible points (those meeting the NF and stability-margin constraints). If multiple points have similar gain, I use **lower NF** and then **larger minimum stability margin** as tie-breakers. The selected `Gamma_S*` is the best point found by the **coarse sweep plus local refinement** around the best coarse candidate.
 
 #### Stability margins
 I enforce the stability margin constraints using signed distance to the stability-circle boundaries in both planes:
@@ -264,13 +265,16 @@ I enforce the stability margin constraints using signed distance to the stabilit
 with the requirement that both margins are $\ge 0.05$.
 
 #### Sweep and refinement outputs
-I run a coarse `Gamma_S` sweep and then refine locally around the best feasible point (ranked by higher `G_A`, then lower `NF`, then larger minimum stability margin).
+I run a coarse `Gamma_S` sweep and then refine locally around the best feasible point using the objective/tie-break rules above.
 
 Outputs are saved as:
 - `documentation/NE7684A_step6_sweep.csv`
 - `documentation/NE7684A_step6_refined_sweep.csv`
 
 All feasible points satisfy the hard constraints (G_A > 18 dB, NF $\leq 1.7$ dB, and stability margins $\geq 0.05$). I rank feasible points primarily by **higher G_A**, then **lower NF**, then **larger minimum stability margin**.
+
+![Sweep Sample](documentation/sweep_example.png)
+Note: the full sweep contains hundreds of points; this figure is only a small excerpt for illustration. The complete data is in the CSV outputs above.
 
 **NE7684A best refined feasible point (selected):**
 - `Gamma_S*` $\approx$ -0.198111 + j0.480831
@@ -374,6 +378,9 @@ Step 9: Smith-chart design of the input and output matching networks
 
 To synthesize the matching networks, I use **two separate Smith charts** (one in the Gamma_S plane for the input match and one in the Gamma_L plane for the output match). Each chart shows the target reflection coefficient at 1 GHz (from Step 7–8) and one matching trajectory realizable with the required **series 50-ohm line** and **shunt balanced 2×100-ohm open stubs**.
 
+#### Why this Smith-chart solution branch was chosen
+For a single shunt-stub match there are typically two valid intersections (two `Re{y}=1` solutions). I selected the reported branch because it uses a **realizable shunt-stub susceptance** (not too close to the quarter-wave singularity) and keeps the geometry straightforward for layout (a single shunt node with one series line section to the device).
+
 #### Correct single-shunt-stub synthesis sequence
 For a single shunt-stub match, the synthesis is done from the **target plane** back toward the 50-ohm port:
 
@@ -422,6 +429,9 @@ In Step 10, I convert the Step 9 electrical lengths to **physical microstrip len
 - **Design-curve results used (at $\varepsilon_r=4$)**:
   - 50-ohm microstrip: `W/h` approx 1.1, lambda ratio approx 1.15
   - 100-ohm microstrip: `W/h` approx 0.6, lambda ratio approx 1.2
+- **Note on width sources/accuracy**:
+  - 50-ohm and 100-ohm widths are taken from the provided microstrip design charts.
+  - 20-ohm and 200-ohm widths (used in the bias network) are computed from closed-form microstrip formulas because 200 ohm is not on the chart; therefore these widths may be slightly off compared to a full EM/coupled model or a dedicated line calculator.
 - **Determine guided wavelength** for each impedance class (because $W/h$ differs):
   - $\lambda_{g,50}$ for the 50 $\Omega$ line
   - $\lambda_{g,100}$ for the 100 $\Omega$ stub line
@@ -518,7 +528,7 @@ These 20-ohm / 200-ohm quarter-wave sections are used to feed the gate and drain
 Part 12: Drawing Layout
 
 ![Drawing](documentation/drawing_layout.jpg)
-Note: while the drawing is not 100% to scale, it is pretty close since I did it by hand. Dimensions are provided and labelled for clarity.
+This is an annotated layout sketch based on the computed physical lengths; it is dimensioned for clarity but not a strict CAD-accurate scale drawing.
 
 Part 13: Final amplifier circuit and performance tradeoff
 
