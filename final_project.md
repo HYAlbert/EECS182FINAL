@@ -89,14 +89,6 @@ $$k = \frac{1 - |S_{11}|^2 - |S_{22}|^2 + |\Delta|^2}{2|S_{12} S_{21}|}$$
 
 When $k \leq 1$ the device is only **conditionally stable**, so I draw stability circles to identify the stable regions in the $\Gamma_S$ and $\Gamma_L$ planes. In this report, **source** refers to the **input** plane ($\Gamma_S$) and **load** refers to the **output** plane ($\Gamma_L$).
 
-**Load stability circle** (in the $\Gamma_L$ plane):
-
-$$C_L = \frac{\bigl(S_{22} - \Delta\, S_{11}^{*}\bigr)^{*}}{\bigl|S_{22}\bigr|^{2} - \bigl|\Delta\bigr|^{2}} \qquad r_L = \left|\frac{S_{12}\, S_{21}}{\bigl|S_{22}\bigr|^{2} - \bigl|\Delta\bigr|^{2}}\right|$$
-
-**Source stability circle** (in the $\Gamma_S$ plane):
-
-$$C_S = \frac{\bigl(S_{11} - \Delta\, S_{22}^{*}\bigr)^{*}}{\bigl|S_{11}\bigr|^{2} - \bigl|\Delta\bigr|^{2}} \qquad r_S = \left|\frac{S_{12}\, S_{21}}{\bigl|S_{11}\bigr|^{2} - \bigl|\Delta\bigr|^{2}}\right|$$
-
 **Load stability circle** (in the $\Gamma_{L}$ plane):
 
 $$
