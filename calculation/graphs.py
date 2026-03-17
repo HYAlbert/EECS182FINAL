@@ -1,7 +1,7 @@
 """
 Stability-circle plotting utilities for EECS 182 Final Project.
 
-Draws input and output stability circles on a Gamma-plane plot with a
+Draws source and load stability circles on Gamma-plane plots with a
 unit circle for reference.  Each plot includes the base stability circle
 and a margin circle (same center, radius ± 0.05).
 """
@@ -22,28 +22,17 @@ def _circle_points(center: complex, radius: float, n: int = 361) -> tuple:
     return x, y
 
 
-def plot_stability_circle(
+def _draw_stability(
+    ax,
     center: complex,
     radius: float,
     margin_radius: float,
     stable_inside: bool,
     title: str,
-    filename: str,
 ) -> None:
     """
-    Plot a single stability circle with its margin circle on the Gamma plane.
-
-    Parameters
-    ----------
-    center : complex – circle center in the Gamma plane
-    radius : float – base stability-circle radius
-    margin_radius : float – margin-adjusted radius (±0.05)
-    stable_inside : bool – True if stable region is inside the circle
-    title : str – plot title
-    filename : str – output JPG filename (saved into OUTPUT_DIR)
+    Draw a stability circle with its margin circle on the given axis.
     """
-    fig, ax = plt.subplots(figsize=(7, 7))
-
     uc_x, uc_y = _circle_points(0 + 0j, 1.0)
     ax.plot(uc_x, uc_y, "k-", linewidth=1.5, label=r"|$\Gamma$| = 1 (unit circle)")
 
@@ -75,38 +64,51 @@ def plot_stability_circle(
     ax.grid(True, linestyle=":", alpha=0.6)
     ax.legend(loc="lower right", fontsize=9)
 
+
+def plot_device_stability_figure(name: str, data: dict) -> None:
+    """
+    Create one figure per device with two subplots: source (Γ_S) and load (Γ_L).
+    Saves to documentation/{name}_stability.jpg.
+    """
+    fig, (ax_src, ax_load) = plt.subplots(1, 2, figsize=(14, 7))
+
+    inp = data["input"]
+    _draw_stability(
+        ax_src,
+        center=inp["center"],
+        radius=inp["radius"],
+        margin_radius=inp["margin_radius"],
+        stable_inside=inp["stable_inside"],
+        title=f"{name} — Source Stability Circle ($\\Gamma_S$ plane)",
+    )
+
+    out = data["output"]
+    _draw_stability(
+        ax_load,
+        center=out["center"],
+        radius=out["radius"],
+        margin_radius=out["margin_radius"],
+        stable_inside=out["stable_inside"],
+        title=f"{name} — Load Stability Circle ($\\Gamma_L$ plane)",
+    )
+
+    fig.suptitle(f"{name} Stability Circles", fontsize=14, y=1.02)
+    plt.tight_layout()
+
     os.makedirs(OUTPUT_DIR, exist_ok=True)
-    filepath = os.path.join(OUTPUT_DIR, filename)
+    filepath = os.path.join(OUTPUT_DIR, f"{name}_stability.jpg")
     fig.savefig(filepath, dpi=150, bbox_inches="tight")
     plt.close(fig)
     print(f"Saved: {filepath}")
 
 
 def plot_device_stability_circles(results: dict) -> None:
-    """Generate source and load stability-circle plots for every device."""
+    """Generate one combined stability figure per device (3 total JPGs)."""
     for name, data in results.items():
-        inp = data["input"]
-        plot_stability_circle(
-            center=inp["center"],
-            radius=inp["radius"],
-            margin_radius=inp["margin_radius"],
-            stable_inside=inp["stable_inside"],
-            title=f"{name} — Source Stability Circle ($\\Gamma_S$ plane)",
-            filename=f"{name}_source_stability.jpg",
-        )
-
-        out = data["output"]
-        plot_stability_circle(
-            center=out["center"],
-            radius=out["radius"],
-            margin_radius=out["margin_radius"],
-            stable_inside=out["stable_inside"],
-            title=f"{name} — Load Stability Circle ($\\Gamma_L$ plane)",
-            filename=f"{name}_load_stability.jpg",
-        )
+        plot_device_stability_figure(name, data)
 
 
 if __name__ == "__main__":
     results = compute_all_stability_circles()
     plot_device_stability_circles(results)
-    print("\nAll 6 stability-circle plots generated.")
+    print("\nAll 3 stability-circle plots generated.")
