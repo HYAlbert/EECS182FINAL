@@ -75,6 +75,49 @@ NE7684C
 - $S_{22}$ phase $77.0$
 
 Step 1:
-to be completed later
+I will complete this later.
 
-Step 2:
+Step 2: Stability Analysis
+
+### Stability Circle Equations
+
+A two-port network is **unconditionally stable** when the Rollet stability factor $k > 1$ and $|\Delta| < 1$, where:
+
+$$\Delta = S_{11} S_{22} - S_{12} S_{21}$$
+
+$$k = \frac{1 - |S_{11}|^2 - |S_{22}|^2 + |\Delta|^2}{2|S_{12} S_{21}|}$$
+
+When $k \leq 1$ the device is only **conditionally stable**, so I draw stability circles to identify the stable regions in the $\Gamma_S$ and $\Gamma_L$ planes. In this report, **source** refers to the **input** plane ($\Gamma_S$) and **load** refers to the **output** plane ($\Gamma_L$).
+
+**Load stability circle** (in the $\Gamma_L$ plane):
+
+$$C_L = \frac{(S_{22} - \Delta\, S_{11}^*)^*}{\;|S_{22}|^2 - |\Delta|^2\;} \qquad r_L = \left|\frac{S_{12}\, S_{21}}{\;|S_{22}|^2 - |\Delta|^2\;}\right|$$
+
+**Source stability circle** (in the $\Gamma_S$ plane):
+
+$$C_S = \frac{(S_{11} - \Delta\, S_{22}^*)^*}{\;|S_{11}|^2 - |\Delta|^2\;} \qquad r_S = \left|\frac{S_{12}\, S_{21}}{\;|S_{11}|^2 - |\Delta|^2\;}\right|$$
+
+**Determining the stable side:** If $|S_{11}| < 1$ (or $|S_{22}| < 1$), the center of the Smith chart ($\Gamma = 0$) is known to be stable. I test whether the origin lies inside or outside the stability circle. If the origin is outside the circle, the stable region is outside; if inside, the stable region is inside. This determines the sign of the margin adjustment.
+
+**Stability margin:** I draw a second circle with the same center but radius adjusted by $\pm\,0.05$. If the stable region is **outside** the circle, the margin circle has radius $r + 0.05$ (expanding toward the stable side). If the stable region is **inside** the circle, the margin circle has radius $r - 0.05$ (shrinking toward the stable side). I kept the $\Gamma_S$ and $\Gamma_L$ within the margin circle boundary to satisfy the $\geq 0.05$ stability margin requirement.
+
+### Computed Results
+
+I compute the stability circles for all three devices in `calculation/calculations.py` and plot them via `calculation/graphs.py`. I save the resulting 6 graphs (source and load plane for each device) as JPG files under `documentation/`.
+
+**Summary of stability for each device:**
+
+| Device | $k$ | $|\Delta|$ | Unconditionally stable? |
+|--------|-----|-----------|------------------------|
+| NE7684A | 0.5315 | 0.1549 | No ($k < 1$) |
+| NE7684B | 0.8033 | 0.1266 | No ($k < 1$) |
+| NE7684C | 0.2578 | 0.2951 | No ($k < 1$) |
+
+All three devices are **conditionally stable** ($k < 1$). In every case, the origin ($\Gamma = 0$) lies outside the stability circle, so the **stable region is outside** the circle. The margin circle (red dashed) has radius $r + 0.05$, and the design must keep $\Gamma_S$ / $\Gamma_L$ outside that boundary.
+
+![NE7684A Source Stability](documentation/NE7684A_source_stability.jpg)
+![NE7684A Load Stability](documentation/NE7684A_load_stability.jpg)
+![NE7684B Source Stability](documentation/NE7684B_source_stability.jpg)
+![NE7684B Load Stability](documentation/NE7684B_load_stability.jpg)
+![NE7684C Source Stability](documentation/NE7684C_source_stability.jpg)
+![NE7684C Load Stability](documentation/NE7684C_load_stability.jpg)

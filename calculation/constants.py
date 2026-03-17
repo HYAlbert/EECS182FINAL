@@ -1,31 +1,47 @@
-#S parameters of the 3 devices
-S parameters at VDS = 3V, ID = 10 mA
-NE7684A
-S11 mag 0.65
-S11 phase -135.1
-S21 mag 6.72
-S21 phase 45.0
-S12 mag 0.051
-S12 phase 34.1
-S22 mag 0.487
-S22 phase -119
+"""
+S-parameter constants for the three devices.
 
-NE7684B
-S11 mag 0.580
-S11 phase -135
-S21 mag 5.40
-S21 phase 45.1
-S12 mag 0.051
-S12 phase 34.7
-S22 mag 0.487
-S22 phase -119
+S parameters at VDS = 3 V, ID = 10 mA.
+"""
 
-NE7684C
-S11 mag 0.780
-S11 phase-15.0
-S21 mag5.100
-S21 phase 65.0
-S12 mag 0.051
-S12 phase 34.0
-S22 mag 0.587
-S22 phase 77.0
+VDS = 3.0  # Volts
+ID = 10e-3  # Amperes
+
+NE7684A_S_PARAMS = {
+    "S11_MAG": 0.65,
+    "S11_PHASE_DEG": -135.1,
+    "S21_MAG": 6.72,
+    "S21_PHASE_DEG": 45.0,
+    "S12_MAG": 0.051,
+    "S12_PHASE_DEG": 34.1,
+    "S22_MAG": 0.487,
+    "S22_PHASE_DEG": -119.0,
+}
+
+NE7684B_S_PARAMS = {
+    "S11_MAG": 0.580,
+    "S11_PHASE_DEG": -135.0,
+    "S21_MAG": 5.40,
+    "S21_PHASE_DEG": 45.1,
+    "S12_MAG": 0.051,
+    "S12_PHASE_DEG": 34.7,
+    "S22_MAG": 0.487,
+    "S22_PHASE_DEG": -119.0,
+}
+
+NE7684C_S_PARAMS = {
+    "S11_MAG": 0.780,
+    "S11_PHASE_DEG": -15.0,
+    "S21_MAG": 5.100,
+    "S21_PHASE_DEG": 65.0,
+    "S12_MAG": 0.051,
+    "S12_PHASE_DEG": 34.0,
+    "S22_MAG": 0.587,
+    "S22_PHASE_DEG": 77.0,
+}
+
+ALL_DEVICE_S_PARAMS = {
+    "NE7684A": NE7684A_S_PARAMS,
+    "NE7684B": NE7684B_S_PARAMS,
+    "NE7684C": NE7684C_S_PARAMS,
+}
