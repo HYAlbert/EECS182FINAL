@@ -162,3 +162,166 @@ I draw gain circles at **18, 19, 20, 21, 22, 23, and 24 dB** to cover the requir
 ![NE7684A Gain](documentation/NE7684A_gain.jpg)
 ![NE7684B Gain](documentation/NE7684B_gain.jpg)
 ![NE7684C Gain](documentation/NE7684C_gain.jpg)
+
+Step 4: Noise Circles
+
+### Noise Figure Circle Equations
+
+The device noise is described by four **noise parameters** at 1 GHz: minimum noise figure $NF_{min}$, optimum source reflection coefficient $\Gamma_{opt}$, and normalized noise resistance $R_n/Z_0$. The noise figure depends on the source reflection coefficient $\Gamma_S$, so constant-noise-figure contours are drawn in the **$\Gamma_S$ plane**.
+
+Convert noise figures from dB to linear noise factors:
+$$F = 10^{NF/10}, \qquad F_{min} = 10^{NF_{min}/10}$$
+
+The noise factor as a function of $\Gamma_S$ is:
+$$
+F(\Gamma_S) = F_{min} + \frac{4(R_n/Z_0)\,|\Gamma_S - \Gamma_{opt}|^2}{(1-|\Gamma_S|^2)\,|1+\Gamma_{opt}|^2}
+$$
+
+For a **constant** noise figure $F$, define the parameter:
+$$
+N = \frac{(F - F_{min})\,|1+\Gamma_{opt}|^2}{4(R_n/Z_0)}
+$$
+
+Then the constant-noise-figure circle has:
+$$
+c_N = \frac{\Gamma_{opt}}{1+N},
+\qquad
+r_N = \frac{\sqrt{N^2 + N(1-|\Gamma_{opt}|^2)}}{|1+N|}
+$$
+
+### 1.7 dB Circle and Direction to Lower Noise
+
+The project requirement is **NF $\leq 1.7$ dB**, so I plot the **1.7 dB** noise circle for each device using the noise parameters in `calculation/constants.py` and the equations above (implemented in `calculation/calculations.py`, plotted in `calculation/graphs.py`).
+
+**Minimum noise occurs at $\Gamma_S = \Gamma_{opt}$.** Moving **toward $\Gamma_{opt}$** reduces noise figure; moving **away** increases noise figure. On each plot I mark $\Gamma_{opt}$ and draw an arrow pointing toward it (labeled “Lower NF”).
+
+### Computed Results
+
+![NE7684A Noise](documentation/NE7684A_noise.jpg)
+![NE7684B Noise](documentation/NE7684B_noise.jpg)
+![NE7684C Noise](documentation/NE7684C_noise.jpg)
+
+Step 5: Selecting the Device
+
+### Combined Constraint Plots
+
+To select the best device, I overlay **gain circles (18–24 dB)**, the **NF = 1.7 dB** noise circle, and the **input stability + margin** circle in the **$\Gamma_S$ plane**, and also show the **output stability + margin** circle in the **$\Gamma_L$ plane** (right subplot). This makes it easy to see whether there is a feasible $\Gamma_S$ region that can meet **gain**, **noise**, and **stability margin** simultaneously.
+
+![NE7684A Combined](documentation/NE7684A_combined.jpg)
+![NE7684B Combined](documentation/NE7684B_combined.jpg)
+![NE7684C Combined](documentation/NE7684C_combined.jpg)
+
+### Device Choice
+
+From the combined plots and the provided 1 GHz parameters:
+
+- **NE7684A (selected)**: offers the best tradeoff because it has the **highest forward gain** (largest $|S_{21}|$) and the **lowest $NF_{min}$**. In the $\Gamma_S$ overlay plot there is a clear overlap between the **NF $\le 1.7$ dB** region and the available-gain circles, and the NF boundary extends into part of the **$\sim$21 dB** gain-circle region.\n+\n+- **NE7684B (rejected)**: is not feasible for the requirements because the **$G_A=18$ dB** gain circle does **not** overlap with the region that satisfies **NF $\le 1.7$ dB**. This means there is no $\Gamma_S$ that meets both the gain and noise requirements at the same time.\n+\n+- **NE7684C (works but worse)**: can work, but has a **smaller overlap** region and a worse tradeoff. For example, the NF boundary only extends to about the **$\sim$20 dB** gain-circle region. NE7684C also has the **lowest $k$** (least stable), so meeting constraints like **VSWR\_IN** during tuning is likely harder.\n+\n+Therefore I proceed with **NE7684A** for the remaining design steps.
+
+Step 6: Device Tuning
+
+### Device Tuning Sweep (joint $\Gamma_S$–$\Gamma_L$ tradeoffs)
+
+For the selected device (**NE7684A**) at $1\,\text{GHz}$, I perform a **joint device-plane sweep** over both $\Gamma_S$ and $\Gamma_L$ to find a termination pair that satisfies the hard requirements on gain, noise, stability margin, and input VSWR.
+
+#### Why the sweep must be joint
+Forcing $\Gamma_L=\Gamma_{out}^*$ is a gain-driven (available-gain) assumption and does not generally minimize $|\Gamma_{in}|$. Since $\mathrm{VSWR}_{INPUT}<3{:}1$ is critical, $\Gamma_S$ and $\Gamma_L$ must be tuned together to meet gain/noise while keeping the device-plane input mismatch small enough.
+
+#### Device-plane input VSWR check
+For each candidate $\Gamma_L$, I compute the terminated two-port input reflection coefficient
+$$
+\Gamma_{in}=S_{11}+\frac{S_{12}S_{21}\Gamma_L}{1-S_{22}\Gamma_L}
+$$
+and compute the corresponding device-plane input VSWR:
+$$
+\mathrm{VSWR}_{IN,\text{device}}=\frac{1+|\Gamma_{in}|}{1-|\Gamma_{in}|}
+$$
+During Step 6 I require $\mathrm{VSWR}_{IN,\text{device}}<3$ as a feasibility check. The final **external-port** VSWR requirements are still verified after synthesizing the matching networks in later steps.
+
+#### Gain and noise metrics
+- **Gain constraint**: I enforce $G_A(\Gamma_S)>18\,\text{dB}$ (available gain) as the gain requirement.
+- **Noise constraint**: I enforce $NF(\Gamma_S)\le1.7\,\text{dB}$ using the device noise parameters.
+- I also compute the transducer gain $G_T(\Gamma_S,\Gamma_L)$ as a reference metric during the joint sweep.
+
+#### Stability margins
+I enforce the stability margin constraints using signed distance to the stability-circle boundaries in both planes:
+- source plane uses $\Gamma=\Gamma_S$
+- load plane uses $\Gamma=\Gamma_L$
+with the requirement that both margins are $\ge 0.05$.
+
+#### Sweep and refinement outputs
+I run a coarse joint sweep over stable regions and then refine locally around the best feasible point.
+
+Outputs are saved as:
+- `documentation/NE7684A_step6_joint_sweep.csv`
+- `documentation/NE7684A_step6_joint_refined.csv`
+- `documentation/NE7684C_step6_joint_sweep.csv`
+
+All feasible points satisfy the hard constraints ($G_A>18\,\text{dB}$, $NF\le1.7\,\text{dB}$, $\mathrm{VSWR}_{IN,\text{device}}<3$, and stability margins $\ge 0.05$). Since stability is enforced as a hard constraint, I rank feasible points primarily by **gain**, then **noise figure**, then **VSWR**:
+
+1. higher $G_A$
+2. lower $NF$
+3. lower $\mathrm{VSWR}_{IN,\text{device}}$
+
+**NE7684A best coarse feasible point (ranked):**
+- $\Gamma_S \approx -0.2500 + j0.4330$
+- $\Gamma_L \approx 0.9356 - j0.1650$
+- $G_A \approx 21.16\,\text{dB}$, $NF \approx 1.63\,\text{dB}$, $\mathrm{VSWR}_{IN,\text{device}} \approx 2.40$
+- stability margins: $m_{in}\approx 0.319$, $m_{out}\approx 1.488$
+
+**NE7684A best refined feasible point (ranked):**
+- $\Gamma_S \approx -0.2600 + j0.4530$
+- $\Gamma_L \approx 0.9856 - j0.1650$
+- $G_A \approx 21.32\,\text{dB}$, $NF \approx 1.70\,\text{dB}$, $\mathrm{VSWR}_{IN,\text{device}} \approx 2.35$
+- stability margins: $m_{in}\approx 0.301$, $m_{out}\approx 1.528$
+
+#### Comparison to NE7684C
+
+I repeated the same coarse joint $\Gamma_S$–$\Gamma_L$ sweep for **NE7684C** under the same hard constraints. On the coarse grid, **NE7684C produced no feasible points**, meaning it could not simultaneously satisfy the gain, noise, VSWR, and stability-margin constraints at 1 GHz.
+
+This confirms that **NE7684C has worse Step 6 tuning feasibility than NE7684A** under the project specifications.
+
+Step 7: Select the optimum input $\Gamma_S$
+
+### Definition of “optimum” and hard constraints
+Here I use $\Gamma_S$ (same as $\Gamma_s$ in the project statement) to denote the source/input reflection coefficient. The optimum $\Gamma_S$ is selected from the feasible region in the $\Gamma_S$ plane that simultaneously satisfies:
+
+- **Gain**: $G_A(\Gamma_S) > 18\,\text{dB}$
+- **Noise**: $NF(\Gamma_S)\le 1.7\,\text{dB}$
+- **Input-plane stability margin**: $m_{in}\ge 0.05$ (per the stability-margin construction in Step 2)
+- **Critical input mismatch (VSWR) feasibility**: the terminated device-plane input reflection coefficient must satisfy
+  $$
+  \Gamma_{in}=S_{11}+\frac{S_{12}S_{21}\Gamma_L}{1-S_{22}\Gamma_L}
+  $$
+  and
+  $$
+  \mathrm{VSWR}_{IN,\text{device}}=\frac{1+|\Gamma_{in}|}{1-|\Gamma_{in}|}<3
+  \quad\Longleftrightarrow\quad
+  |\Gamma_{in}|<0.5
+  $$
+
+Since $\Gamma_{in}$ depends on $\Gamma_L$, this selection is based on the **joint** $\Gamma_S$–$\Gamma_L$ feasible set computed in Step 6. Among feasible points (all hard constraints met), I rank candidates by: (1) higher $G_A$, then (2) lower $NF$, then (3) lower $\mathrm{VSWR}_{IN,\text{device}}$.
+
+### Selected optimum $\Gamma_S$
+From the refined joint sweep for **NE7684A**, the optimum input termination is:
+
+- $\Gamma_S^\star \approx -0.2600 + j0.4530$
+
+At this point the design meets all hard constraints:
+- $G_A \approx 21.32\,\text{dB}$
+- $NF \approx 1.70\,\text{dB}$
+- $\mathrm{VSWR}_{IN,\text{device}} \approx 2.35$ (i.e., $|\Gamma_{in}|<0.5$)
+- input stability margin: $m_{in}\approx 0.301\ge 0.05$
+
+Step 8: Select the corresponding $\Gamma_L$ and verify stability requirements
+
+The corresponding output termination for the selected $\Gamma_S^\star$ (from the same refined feasible optimum) is:
+
+- $\Gamma_L^\star \approx 0.9856 - j0.1650$
+
+### Output-plane stability margin verification
+Using the output stability circle and margin circle defined in Step 2, $\Gamma_L^\star$ must lie in the **stable region** and satisfy the required stability margin:
+
+- output stability margin: $m_{out}\approx 1.528\ge 0.05$
+
+### Note on the $\mathrm{VSWR}_{OUT}=1{:}1$ requirement
+The project requirement $\mathrm{VSWR}_{OUT}=1{:}1$ is an **external-port** requirement. In Steps 9–10, the output matching network will be synthesized to present the device with $\Gamma_L^\star$ while maintaining a matched $50\,\Omega$ output port.

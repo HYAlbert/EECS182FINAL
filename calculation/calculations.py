@@ -9,10 +9,11 @@ g_A = G_A/|S21|^2.
 
 import cmath
 import math
-from constants import ALL_DEVICE_S_PARAMS
+from constants import ALL_DEVICE_S_PARAMS, ALL_DEVICE_NOISE_PARAMS_1GHZ, NOISE_FIGURE_DB_MAX
 
 STABILITY_MARGIN = 0.05
 GAIN_LEVELS_DB = [18, 19, 20, 21, 22, 23, 24]
+NOISE_CIRCLE_DB = NOISE_FIGURE_DB_MAX
 
 
 def polar_to_complex(mag: float, phase_deg: float) -> complex:
@@ -43,6 +44,21 @@ def compute_rollet_k(S: dict) -> float:
     )
     denominator = 2 * abs(S["S12"] * S["S21"])
     return numerator / denominator
+
+
+def compute_edwards_sinsky_mu(S: dict) -> tuple[float, float]:
+    """
+    Edwards–Sinsky stability factors (mu1, mu2).
+
+    Unconditional stability is guaranteed if mu1 > 1 and mu2 > 1.
+    """
+    delta = compute_delta(S)
+    denom1 = abs(S["S22"] - delta * S["S11"].conjugate()) + abs(S["S12"] * S["S21"])
+    denom2 = abs(S["S11"] - delta * S["S22"].conjugate()) + abs(S["S12"] * S["S21"])
+
+    mu1 = (1 - abs(S["S11"]) ** 2) / denom1 if denom1 != 0 else float("inf")
+    mu2 = (1 - abs(S["S22"]) ** 2) / denom2 if denom2 != 0 else float("inf")
+    return mu1, mu2
 
 
 def compute_output_stability_circle(S: dict) -> tuple:
@@ -99,6 +115,121 @@ def db_to_linear(db: float) -> float:
     return 10 ** (db / 10.0)
 
 
+def compute_noise_figure_linear(noise_params: dict, gamma_s: complex) -> float:
+    """
+    Compute noise factor F (linear) at a given Γ_S using the 4 noise parameters.
+
+    F = Fmin + (4 * (Rn/Z0) * |ΓS - Γopt|^2) / ((1 - |ΓS|^2) * |1 + Γopt|^2)
+    """
+    fmin = db_to_linear(noise_params["NFMIN_DB"])
+    gamma_opt = polar_to_complex(
+        noise_params["GAMMA_OPT_MAG"], noise_params["GAMMA_OPT_ANG_DEG"]
+    )
+    rn_over_z0 = noise_params["RN_OVER_Z0"]
+
+    denom = (1 - abs(gamma_s) ** 2) * (abs(1 + gamma_opt) ** 2)
+    if denom <= 0:
+        return float("inf")
+
+    return fmin + (4 * rn_over_z0 * (abs(gamma_s - gamma_opt) ** 2)) / denom
+
+
+def compute_noise_circle(noise_params: dict, nf_dB: float) -> tuple | None:
+    """
+    Compute center and radius of a constant noise figure circle in the Γ_S plane.
+
+    Define:
+      N = ((F - Fmin) * |1 + Γopt|^2) / (4 * (Rn/Z0))
+
+    Then:
+      c_N = Γopt / (1 + N)
+      r_N = sqrt(N^2 + N(1 - |Γopt|^2)) / |1 + N|
+
+    Returns (center, radius, gamma_opt) or None if invalid.
+    """
+    f = db_to_linear(nf_dB)
+    fmin = db_to_linear(noise_params["NFMIN_DB"])
+    gamma_opt = polar_to_complex(
+        noise_params["GAMMA_OPT_MAG"], noise_params["GAMMA_OPT_ANG_DEG"]
+    )
+    rn_over_z0 = noise_params["RN_OVER_Z0"]
+
+    if rn_over_z0 <= 0:
+        return None
+
+    n = ((f - fmin) * (abs(1 + gamma_opt) ** 2)) / (4 * rn_over_z0)
+    if n < 0:
+        return None
+
+    denom = 1 + n
+    radicand = n**2 + n * (1 - abs(gamma_opt) ** 2)
+    if radicand < 0:
+        return None
+
+    center = gamma_opt / denom
+    radius = math.sqrt(radicand) / abs(denom)
+    return center, radius, gamma_opt
+
+
+def compute_all_noise_circles(nf_dB: float = NOISE_CIRCLE_DB) -> dict:
+    """
+    Compute constant-NF noise circles for every device at the given nf_dB.
+
+    Returns a nested dict keyed by device name, each containing:
+      - nf_dB, center, radius, gamma_opt, valid
+      - input: stability circle data (for overlay)
+    """
+    stability = compute_all_stability_circles()
+    results: dict = {}
+    for name, noise_params in ALL_DEVICE_NOISE_PARAMS_1GHZ.items():
+        circle = compute_noise_circle(noise_params, nf_dB)
+        if circle is None:
+            results[name] = {
+                "nf_dB": nf_dB,
+                "center": None,
+                "radius": None,
+                "gamma_opt": None,
+                "valid": False,
+                "input": stability[name]["input"],
+            }
+            continue
+
+        center, radius, gamma_opt = circle
+        results[name] = {
+            "nf_dB": nf_dB,
+            "center": center,
+            "radius": radius,
+            "gamma_opt": gamma_opt,
+            "valid": True,
+            "input": stability[name]["input"],
+        }
+    return results
+
+
+def verify_noise_circle(
+    noise_params: dict,
+    nf_dB: float,
+    center: complex,
+    radius: float,
+    n_points: int = 36,
+) -> float:
+    """
+    Sample points on a noise circle and compute NF at each. Return max |error| in dB.
+    """
+    max_err_db = 0.0
+    for i in range(n_points):
+        theta = 2 * math.pi * i / n_points
+        gamma_s = center + radius * cmath.rect(1, theta)
+        if abs(gamma_s) >= 1.0:
+            continue
+        f_linear = compute_noise_figure_linear(noise_params, gamma_s)
+        if f_linear <= 0 or not math.isfinite(f_linear):
+            continue
+        nf_db_meas = 10 * math.log10(f_linear)
+        max_err_db = max(max_err_db, abs(nf_db_meas - nf_dB))
+    return max_err_db
+
+
 def compute_available_gain_linear(S: dict, gamma_s: complex) -> float:
     """
     Compute available gain G_A (linear) at a given Γ_S.
@@ -112,6 +243,78 @@ def compute_available_gain_linear(S: dict, gamma_s: complex) -> float:
         return float("inf")  # Singular or unstable
     ga = (abs(S["S21"]) ** 2) * (1 - abs(gamma_s) ** 2) / (abs(denom1) ** 2 * denom2)
     return ga
+
+
+def compute_transducer_gain_linear(S: dict, gamma_s: complex, gamma_l: complex) -> float:
+    """
+    Compute transducer gain G_T (linear) for given (ΓS, ΓL).
+
+    G_T = (1-|ΓS|^2) |S21|^2 (1-|ΓL|^2) /
+          ( |(1-S11 ΓS)(1-S22 ΓL) - S12 S21 ΓS ΓL|^2 )
+    """
+    if abs(gamma_s) >= 1 or abs(gamma_l) >= 1:
+        return 0.0
+
+    denom = (1 - S["S11"] * gamma_s) * (1 - S["S22"] * gamma_l) - (S["S12"] * S["S21"] * gamma_s * gamma_l)
+    denom_mag2 = abs(denom) ** 2
+    if denom_mag2 == 0:
+        return float("inf")
+
+    num = (1 - abs(gamma_s) ** 2) * (abs(S["S21"]) ** 2) * (1 - abs(gamma_l) ** 2)
+    return num / denom_mag2
+
+
+def compute_gamma_out(S: dict, gamma_s: complex) -> complex:
+    """Compute Γout looking into the device output for a given ΓS."""
+    denom = 1 - S["S11"] * gamma_s
+    if abs(denom) < 1e-12:
+        return complex("nan")
+    return S["S22"] + (S["S12"] * S["S21"] * gamma_s) / denom
+
+
+def compute_gamma_in(S: dict, gamma_l: complex) -> complex:
+    """Compute Γin looking into the device input for a given ΓL."""
+    denom = 1 - S["S22"] * gamma_l
+    if abs(denom) < 1e-12:
+        return complex("nan")
+    return S["S11"] + (S["S12"] * S["S21"] * gamma_l) / denom
+
+
+def compute_gamma_a_mag(gamma_in: complex, gamma_s: complex) -> float:
+    """
+    External input mismatch screening magnitude |Γa|.
+
+    |Γa| = | (Γin - ΓS*) / (1 - Γin ΓS) |
+    """
+    denom = 1 - gamma_in * gamma_s
+    if abs(denom) < 1e-12:
+        return float("inf")
+    return abs((gamma_in - gamma_s.conjugate()) / denom)
+
+
+def vswr_from_gamma_mag(gamma_mag: float) -> float:
+    """Compute VSWR from |Γ| (returns inf if |Γ|>=1)."""
+    if gamma_mag >= 1:
+        return float("inf")
+    return (1 + gamma_mag) / (1 - gamma_mag)
+
+
+def stability_signed_margin(
+    gamma: complex,
+    center: complex,
+    radius: float,
+    stable_inside: bool,
+) -> float:
+    """
+    Signed stability margin using distance to circle boundary.
+
+    stable_inside=False (stable outside): m = |Γ - C| - r
+    stable_inside=True  (stable inside):  m = r - |Γ - C|
+    """
+    d = abs(gamma - center)
+    if stable_inside:
+        return radius - d
+    return d - radius
 
 
 def compute_available_gain_circle(S: dict, ga_dB: float) -> tuple | None:
@@ -265,3 +468,12 @@ if __name__ == "__main__":
             if circ["valid"] and circ["center"] is not None and circ["radius"] is not None:
                 err = verify_gain_circle(S, circ["ga_dB"], circ["center"], circ["radius"])
                 print(f"  {name} G_A={circ['ga_dB']} dB: max error = {err:.4f} dB")
+
+    # Verify noise circles at NF requirement
+    noise_results = compute_all_noise_circles()
+    print("\n=== Noise circle verification (max |error| in dB) ===")
+    for name, noise_params in ALL_DEVICE_NOISE_PARAMS_1GHZ.items():
+        d = noise_results[name]
+        if d["valid"] and d["center"] is not None and d["radius"] is not None:
+            err = verify_noise_circle(noise_params, d["nf_dB"], d["center"], d["radius"])
+            print(f"  {name} NF={d['nf_dB']} dB: max error = {err:.4f} dB")
